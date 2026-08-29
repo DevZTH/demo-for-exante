@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     semantic_memory_limit: int = Field(default=6, ge=0, le=20)
     embedding_dimensions: int = Field(default=64, ge=16, le=1536)
 
-    llm_provider: Literal["ollama", "openrouter", "openai_compatible"] = "ollama"
+    llm_provider: Literal["ollama", "demo", "openrouter", "openai_compatible"] = "ollama"
     llm_model: str = "gemma4:e2b"
     llm_temperature: float = Field(default=0.2, ge=0, le=2)
     llm_timeout_seconds: float = Field(default=60, gt=0)

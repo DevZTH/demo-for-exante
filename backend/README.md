@@ -6,7 +6,7 @@
 - Chat engine: LangChain.
 - Хранилище: SQLite для чатов/сообщений и `sqlite-vec` для семантической памяти.
 - Настройки: `settings.py` + переменные окружения из `backend/.env`.
-- LLM provider: `ollama`, `openrouter` или любой OpenAI-compatible endpoint.
+- LLM provider: `ollama`, локальный `demo`, `openrouter` или любой OpenAI-compatible endpoint.
 
 ## Структура
 
@@ -34,7 +34,7 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r backend/requirements.txt
 cp backend/.env.example backend/.env
-uvicorn backend.main:app --reload
+bash backend/run.sh
 ```
 
 После запуска:
@@ -80,6 +80,15 @@ CHAT_OLLAMA_BASE_URL=http://localhost:11434
 ```bash
 ollama pull gemma4:e2b
 ollama serve
+```
+
+### Demo
+
+Работает локально без API-ключей и без Ollama. Это только запасной режим для проверки UI, API и памяти LangChain:
+
+```env
+CHAT_LLM_PROVIDER=demo
+CHAT_LLM_MODEL=local-memory-demo
 ```
 
 ### OpenRouter
@@ -140,7 +149,7 @@ curl http://127.0.0.1:8000/api/v1/chats/<CHAT_ID>/messages
 
 Перед запросом к модели `chat_engine.py` делает две вещи:
 
-- берет последние `CHAT_HISTORY_WINDOW_MESSAGES` сообщений как обычную историю диалога;
+- берет последние `CHAT_HISTORY_WINDOW_MESSAGES` сообщений через `SQLiteChatMessageHistory`, совместимый с LangChain `BaseChatMessageHistory`, и передает их в `MessagesPlaceholder`;
 - ищет похожие прошлые сообщения в `sqlite-vec` и добавляет их в системный контекст.
 
 `HashEmbeddings` нужны только для демо, чтобы пример работал без отдельного embedding API. Для production лучше заменить их на реальные embeddings, например Ollama/OpenAI embeddings через LangChain.

@@ -201,6 +201,7 @@ button {
 
 .model-select {
   min-width: 156px;
+  max-width: min(360px, 54vw);
   justify-content: center;
   padding: 0 12px;
   background: #181818;
@@ -208,7 +209,15 @@ button {
   font-weight: 650;
 }
 
+.model-select span:not(.model-dot) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .model-dot {
+  flex: 0 0 auto;
   width: 8px;
   height: 8px;
   border-radius: 999px;
@@ -321,6 +330,11 @@ button {
   border: 1px solid #2d2d2d;
   border-radius: 8px;
   background: #171717;
+}
+
+.message-body.error {
+  border-color: #7f1d1d;
+  background: #2a1515;
 }
 
 .message-body.compact {

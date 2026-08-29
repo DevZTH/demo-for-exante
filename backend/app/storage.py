@@ -144,6 +144,30 @@ class ChatRepository:
 
         return cursor.rowcount > 0
 
+    def clear_messages(self, chat_id: str) -> int:
+        now = self._now()
+
+        with self._connect() as conn:
+            if self.vector_enabled:
+                message_ids = [
+                    row["id"]
+                    for row in conn.execute(
+                        "SELECT id FROM messages WHERE chat_id = ?",
+                        (chat_id,),
+                    ).fetchall()
+                ]
+                for message_id in message_ids:
+                    conn.execute("DELETE FROM message_vectors WHERE rowid = ?", (message_id,))
+
+            cursor = conn.execute("DELETE FROM messages WHERE chat_id = ?", (chat_id,))
+            conn.execute(
+                "UPDATE chats SET updated_at = ? WHERE id = ?",
+                (now, chat_id),
+            )
+            conn.commit()
+
+        return cursor.rowcount
+
     def add_message(
         self,
         chat_id: str,

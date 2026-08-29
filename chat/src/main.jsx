@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   Archive,
@@ -20,66 +20,179 @@ import {
 } from 'lucide-react';
 import './styles.css';
 
-const initialMessages = [
-  {
-    id: 1,
-    role: 'assistant',
-    text: 'Привет! Я небольшой React-чат в стиле OpenWebUI. Напишите сообщение, и я отвечу локальной демо-заготовкой.',
-    time: '15:04',
-  },
-  {
-    id: 2,
-    role: 'user',
-    text: 'Покажи, как может выглядеть компактный интерфейс чата.',
-    time: '15:05',
-  },
-  {
-    id: 3,
-    role: 'assistant',
-    text: 'Вот пример: слева история диалогов, сверху выбор модели, в центре сообщения, снизу composer с кнопками действий. Логику можно подключить к любому API.',
-    time: '15:05',
-  },
-];
-
-const chats = [
-  { title: 'Демо чат', meta: 'Только что' },
-  { title: 'React UI пример', meta: 'Сегодня' },
-  { title: 'Идеи для ассистента', meta: 'Вчера' },
-];
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000/api/v1';
 
 const suggestions = [
-  'Сделай ответ короче',
-  'Добавь поддержку API',
-  'Покажи светлую тему',
+  'Запомни, что меня зовут Алекс',
+  'Что ты помнишь?',
+  'О чем мой проект?',
 ];
 
-function nowTime() {
+const welcomeMessage = {
+  id: 'welcome',
+  role: 'assistant',
+  text: 'Привет! Я готов к диалогу. Сообщения сохраняются в SQLite, а история подключена к LangChain memory.',
+  time: nowTime(),
+};
+
+function formatTime(value) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) {
+    return nowTime();
+  }
+
   return new Intl.DateTimeFormat('ru-RU', {
     hour: '2-digit',
     minute: '2-digit',
-  }).format(new Date());
+  }).format(date);
 }
 
-function createDemoAnswer(prompt) {
-  const cleanPrompt = prompt.trim();
+function nowTime() {
+  return formatTime();
+}
 
-  return `Получил: «${cleanPrompt}».
+function formatChatMeta(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
 
-В реальном проекте здесь обычно вызывают backend endpoint, который стримит ответ модели. В этом примере состояние хранится в React, поэтому его легко заменить на WebSocket, SSE или обычный fetch.`;
+  const today = new Date();
+  const isToday = date.toDateString() === today.toDateString();
+
+  if (isToday) {
+    return formatTime(date);
+  }
+
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    month: 'short',
+  }).format(date);
+}
+
+function mapMessage(message) {
+  return {
+    id: message.id,
+    role: message.role,
+    text: message.content,
+    time: formatTime(message.created_at),
+  };
+}
+
+async function apiFetch(path, options) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options?.headers ?? {}),
+    },
+    ...options,
+  });
+
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(details || `HTTP ${response.status}`);
+  }
+
+  if (response.status === 204) {
+    return null;
+  }
+
+  return response.json();
 }
 
 function App() {
-  const [messages, setMessages] = useState(initialMessages);
+  const [messages, setMessages] = useState([welcomeMessage]);
+  const [chats, setChats] = useState([]);
+  const [activeChatId, setActiveChatId] = useState(null);
+  const [settings, setSettings] = useState(null);
   const [draft, setDraft] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isTyping, setIsTyping] = useState(false);
+  const [error, setError] = useState('');
   const textareaRef = useRef(null);
+  const messagesRef = useRef(null);
 
   const canSend = draft.trim().length > 0 && !isTyping;
 
   const groupedMessages = useMemo(() => messages, [messages]);
+  const activeChat = chats.find((chat) => chat.id === activeChatId);
 
-  function handleSubmit(event) {
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadInitialState() {
+      try {
+        setIsLoading(true);
+        const [runtimeSettings, chatList] = await Promise.all([
+          apiFetch('/settings'),
+          apiFetch('/chats'),
+        ]);
+
+        if (ignore) {
+          return;
+        }
+
+        setSettings(runtimeSettings);
+        setChats(chatList);
+
+        if (chatList.length > 0) {
+          await selectChat(chatList[0].id, { silent: true });
+        }
+      } catch (loadError) {
+        if (!ignore) {
+          setError(`Backend недоступен: ${loadError.message}`);
+        }
+      } finally {
+        if (!ignore) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadInitialState();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    messagesRef.current?.scrollTo({
+      top: messagesRef.current.scrollHeight,
+      behavior: 'smooth',
+    });
+  }, [messages, isTyping]);
+
+  async function refreshChats(nextActiveChatId = activeChatId) {
+    const chatList = await apiFetch('/chats');
+    setChats(chatList);
+
+    if (nextActiveChatId) {
+      setActiveChatId(nextActiveChatId);
+    }
+  }
+
+  async function selectChat(chatId, options = {}) {
+    try {
+      if (!options.silent) {
+        setIsLoading(true);
+      }
+      setError('');
+      setActiveChatId(chatId);
+      const loadedMessages = await apiFetch(`/chats/${chatId}/messages`);
+      setMessages(loadedMessages.map(mapMessage));
+      setIsSidebarOpen(false);
+    } catch (loadError) {
+      setError(`Не удалось загрузить чат: ${loadError.message}`);
+    } finally {
+      if (!options.silent) {
+        setIsLoading(false);
+      }
+    }
+  }
+
+  async function handleSubmit(event) {
     event.preventDefault();
 
     if (!canSend) {
@@ -87,8 +200,9 @@ function App() {
     }
 
     const prompt = draft.trim();
+    const optimisticId = `pending-${Date.now()}`;
     const userMessage = {
-      id: Date.now(),
+      id: optimisticId,
       role: 'user',
       text: prompt,
       time: nowTime(),
@@ -97,20 +211,45 @@ function App() {
     setMessages((current) => [...current, userMessage]);
     setDraft('');
     setIsTyping(true);
+    setError('');
 
-    window.setTimeout(() => {
+    try {
+      const turn = await apiFetch('/chat', {
+        method: 'POST',
+        body: JSON.stringify({
+          chat_id: activeChatId,
+          message: prompt,
+        }),
+      });
+
+      setActiveChatId(turn.chat.id);
+      setMessages((current) => {
+        const savedTurn = [mapMessage(turn.user_message), mapMessage(turn.assistant_message)];
+        if (!activeChatId) {
+          return savedTurn;
+        }
+        return [
+          ...current.filter((message) => message.id !== optimisticId),
+          ...savedTurn,
+        ];
+      });
+      await refreshChats(turn.chat.id);
+    } catch (sendError) {
       setMessages((current) => [
-        ...current,
+        ...current.filter((message) => message.id !== optimisticId),
+        userMessage,
         {
-          id: Date.now() + 1,
+          id: `error-${Date.now()}`,
           role: 'assistant',
-          text: createDemoAnswer(prompt),
+          text: `Не удалось получить ответ backend: ${sendError.message}`,
           time: nowTime(),
         },
       ]);
+      setError('Проверьте, что backend запущен на 127.0.0.1:8000.');
+    } finally {
       setIsTyping(false);
       textareaRef.current?.focus();
-    }, 700);
+    }
   }
 
   function handleTextareaKeyDown(event) {
@@ -121,15 +260,17 @@ function App() {
   }
 
   function startNewChat() {
+    setActiveChatId(null);
     setMessages([
       {
-        id: Date.now(),
-        role: 'assistant',
-        text: 'Новый чат готов. Спросите что-нибудь, и я покажу демо-ответ.',
+        ...welcomeMessage,
+        id: `welcome-${Date.now()}`,
         time: nowTime(),
       },
     ]);
     setDraft('');
+    setError('');
+    setIsSidebarOpen(false);
   }
 
   return (
@@ -156,10 +297,14 @@ function App() {
         </label>
 
         <nav className="chat-list" aria-label="История чатов">
-          {chats.map((chat, index) => (
-            <button className={`chat-item ${index === 0 ? 'active' : ''}`} key={chat.title}>
-              <span>{chat.title}</span>
-              <small>{chat.meta}</small>
+          {chats.map((chat) => (
+            <button
+              className={`chat-item ${chat.id === activeChatId ? 'active' : ''}`}
+              key={chat.id}
+              onClick={() => selectChat(chat.id)}
+            >
+              <span>{chat.title || 'Новый чат'}</span>
+              <small>{formatChatMeta(chat.updated_at)}</small>
             </button>
           ))}
         </nav>
@@ -184,7 +329,7 @@ function App() {
 
           <button className="model-select" aria-label="Выбор модели">
             <span className="model-dot" />
-            <span>gpt-demo</span>
+            <span>{settings?.llm_model ?? 'backend'}</span>
             <ChevronDown size={16} />
           </button>
 
@@ -193,10 +338,25 @@ function App() {
           </button>
         </header>
 
-        <div className="messages" aria-live="polite">
+        <div className="messages" aria-live="polite" ref={messagesRef}>
           <div className="day-divider">
-            <span>Сегодня</span>
+            <span>{activeChat?.title || 'Новый диалог'}</span>
           </div>
+
+          {isLoading && (
+            <article className="message-row assistant">
+              <div className="avatar" aria-hidden="true">
+                <Bot size={18} />
+              </div>
+              <div className="message-body compact">
+                <div className="typing">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              </div>
+            </article>
+          )}
 
           {groupedMessages.map((message) => (
             <article className={`message-row ${message.role}`} key={message.id}>
@@ -222,6 +382,21 @@ function App() {
               </div>
             </article>
           ))}
+
+          {error && (
+            <article className="message-row assistant">
+              <div className="avatar" aria-hidden="true">
+                <Bot size={18} />
+              </div>
+              <div className="message-body error">
+                <div className="message-meta">
+                  <strong>System</strong>
+                  <span>{nowTime()}</span>
+                </div>
+                <p>{error}</p>
+              </div>
+            </article>
+          )}
 
           {isTyping && (
             <article className="message-row assistant">

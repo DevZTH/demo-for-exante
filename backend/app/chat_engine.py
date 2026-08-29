@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from backend.app.domain import ChatTurn, MessageRecord, SemanticMatch
 from backend.app.embeddings import HashEmbeddings
+from backend.app.memory import SQLiteChatMessageHistory
 from backend.app.providers import build_chat_model
 from backend.app.storage import ChatRepository
 from backend.settings import Settings
@@ -26,41 +27,32 @@ class ChatEngine:
         metadata: dict[str, object] | None = None,
     ) -> ChatTurn:
         chat = self.repository.ensure_chat(chat_id, title=self._title_from(message))
-        history = self.repository.list_messages(
-            chat.id,
-            limit=self.settings.history_window_messages,
-        )
-
         query_embedding = self.embeddings.embed_query(message)
         semantic_context = self._semantic_context(chat.id, query_embedding)
+        history = SQLiteChatMessageHistory(
+            repository=self.repository,
+            chat_id=chat.id,
+            history_limit=self.settings.history_window_messages,
+            embeddings=self.embeddings,
+            user_metadata=metadata,
+            assistant_metadata={
+                "provider": self.settings.llm_provider,
+                "model": self.settings.llm_model,
+            },
+        )
 
         response = await self.chain.ainvoke(
             {
                 "system_prompt": self.settings.system_prompt,
                 "semantic_context": self._format_semantic_context(semantic_context),
-                "history": self._to_langchain_messages(history),
+                "history": history.messages,
                 "input": message,
             }
         )
 
         answer = self._content_from_response(response)
-        user_message = self.repository.add_message(
-            chat.id,
-            "user",
-            message,
-            metadata=metadata,
-            embedding=query_embedding,
-        )
-        assistant_message = self.repository.add_message(
-            chat.id,
-            "assistant",
-            answer,
-            metadata={
-                "provider": self.settings.llm_provider,
-                "model": self.settings.llm_model,
-            },
-            embedding=self.embeddings.embed_query(answer),
-        )
+        history.add_messages([HumanMessage(content=message), AIMessage(content=answer)])
+        user_message, assistant_message = self._saved_turn(history.added_records)
 
         updated_chat = self.repository.get_chat(chat.id)
         if updated_chat is None:
@@ -104,20 +96,6 @@ class ChatEngine:
         )
 
     @staticmethod
-    def _to_langchain_messages(messages: list[MessageRecord]) -> list[BaseMessage]:
-        langchain_messages: list[BaseMessage] = []
-
-        for message in messages:
-            if message.role == "user":
-                langchain_messages.append(HumanMessage(content=message.content))
-            elif message.role == "assistant":
-                langchain_messages.append(AIMessage(content=message.content))
-            elif message.role == "system":
-                langchain_messages.append(SystemMessage(content=message.content))
-
-        return langchain_messages
-
-    @staticmethod
     def _format_semantic_context(matches: list[SemanticMatch]) -> str:
         if not matches:
             return "No earlier relevant messages."
@@ -137,7 +115,19 @@ class ChatEngine:
         return str(content)
 
     @staticmethod
+    def _saved_turn(records: list[MessageRecord]) -> tuple[MessageRecord, MessageRecord]:
+        user_message = next((record for record in records if record.role == "user"), None)
+        assistant_message = next(
+            (record for record in records if record.role == "assistant"),
+            None,
+        )
+
+        if user_message is None or assistant_message is None:
+            raise RuntimeError("LangChain memory did not persist the chat turn")
+
+        return user_message, assistant_message
+
+    @staticmethod
     def _title_from(message: str) -> str:
         compact = " ".join(message.split())
         return compact[:80] or "New chat"
-

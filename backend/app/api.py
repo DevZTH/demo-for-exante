@@ -51,6 +51,8 @@ def read_settings(settings: Settings = Depends(get_settings)) -> SettingsRespons
 
 
 def _llm_endpoint(settings: Settings) -> str:
+    if settings.llm_provider == "demo":
+        return "local"
     if settings.llm_provider == "ollama":
         return settings.ollama_base_url
     if settings.llm_provider == "openrouter":
