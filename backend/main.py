@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.app.agent_service import AgentService
 from backend.app.api import router
 from backend.app.chat_engine import ChatEngine
 from backend.app.storage import ChatRepository
@@ -20,6 +21,7 @@ async def lifespan(app: FastAPI):
     app.state.settings = settings
     app.state.repository = repository
     app.state.chat_engine = ChatEngine(settings, repository)
+    app.state.agent_service = AgentService(settings, repository)
 
     yield
 

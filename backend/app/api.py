@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
+from backend.app.agent_service import AgentService
 from backend.app.chat_engine import ChatEngine
 from backend.app.schemas import (
+    AgentRequest,
+    AgentTurnResponse,
     ChatCreateRequest,
     ChatRequest,
     ChatResponse,
@@ -25,6 +28,10 @@ def get_repository(request: Request) -> ChatRepository:
 
 def get_chat_engine(request: Request) -> ChatEngine:
     return request.app.state.chat_engine
+
+
+def get_agent_service(request: Request) -> AgentService:
+    return request.app.state.agent_service
 
 
 router = APIRouter(tags=["chat"])
@@ -118,3 +125,20 @@ def list_messages(
         MessageResponse.from_record(message)
         for message in repository.list_messages(chat_id)
     ]
+
+
+# Agent endpoints
+
+
+@router.post("/agent/chat", response_model=AgentTurnResponse, tags=["agent"])
+async def agent_chat(
+    request: AgentRequest,
+    service: AgentService = Depends(get_agent_service),
+) -> AgentTurnResponse:
+    """Process message in agent simulation (customer role in EXANTE sales scenario)."""
+    turn, agent_response = await service.process_message(
+        message=request.message,
+        chat_id=request.chat_id,
+        metadata=request.metadata,
+    )
+    return AgentTurnResponse.from_turn_and_agent(turn, agent_response)

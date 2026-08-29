@@ -96,3 +96,71 @@ class SettingsResponse(BaseModel):
     history_window_messages: int
     semantic_memory_limit: int
     embedding_dimensions: int
+
+
+# Agent-specific schemas
+
+
+class AgentResponseData(BaseModel):
+    """Agent response with customer state."""
+
+    reply: str = Field(description="Customer reply to the Relationship Manager")
+    intetions: str = Field(
+        description="Internal customer state (hidden from RM)"
+    )
+    state: Literal[
+        "curious", "considering", "interested", "evaluating", 
+        "ready_for_next_step", "ready_to_fund", "rejected"
+    ] = Field(description="Current customer engagement stage")
+    trust: int = Field(ge=0, le=100, description="Trust level in RM (0-100)")
+    purchase_probability: int = Field(
+        ge=0, le=100, description="Probability of opening account (0-100)"
+    )
+    done: bool = Field(description="Whether conversation is complete")
+
+
+class AgentRequest(BaseModel):
+    """Request to agent with message from Relationship Manager."""
+
+    message: str = Field(min_length=1, max_length=20_000, description="RM message")
+    chat_id: str | None = Field(
+        default=None, max_length=120, description="Agent chat session ID"
+    )
+    metadata: dict[str, Any] = Field(
+        default_factory=dict, description="Additional metadata"
+    )
+
+
+class AgentTurnResponse(BaseModel):
+    """Complete response for an agent turn."""
+
+    chat: ChatResponse
+    user_message: MessageResponse
+    assistant_message: MessageResponse
+    agent_response: AgentResponseData
+    context: list[SemanticMatchResponse]
+    provider: str
+    model: str
+
+    @classmethod
+    def from_turn_and_agent(
+        cls,
+        turn: ChatTurn,
+        agent_response: Any,  # AgentResponse from agent_service
+    ) -> "AgentTurnResponse":
+        return cls(
+            chat=ChatResponse.from_record(turn.chat),
+            user_message=MessageResponse.from_record(turn.user_message),
+            assistant_message=MessageResponse.from_record(turn.assistant_message),
+            agent_response=AgentResponseData(
+                reply=agent_response.reply,
+                intetions=agent_response.intetions,
+                state=agent_response.state,
+                trust=agent_response.trust,
+                purchase_probability=agent_response.purchase_probability,
+                done=agent_response.done,
+            ),
+            context=[SemanticMatchResponse.from_match(match) for match in turn.context],
+            provider=turn.provider,
+            model=turn.model,
+        )
