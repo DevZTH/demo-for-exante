@@ -7,11 +7,11 @@ import re
 from langchain_core.embeddings import Embeddings
 
 
-class HashEmbeddings(Embeddings):
-    """Deterministic local embeddings for demo semantic memory.
+class LocalHashEmbeddings(Embeddings):
+    """Deterministic local embeddings for the scenario's semantic memory.
 
-    This keeps sqlite-vec usable without requiring a second external API.
-    Replace it with provider embeddings before production use.
+    This keeps sqlite-vec usable without a second external API. Replace it with
+    provider embeddings when retrieval quality becomes product-critical.
     """
 
     def __init__(self, dimensions: int) -> None:
@@ -36,4 +36,3 @@ class HashEmbeddings(Embeddings):
 
         norm = math.sqrt(sum(value * value for value in vector)) or 1.0
         return [value / norm for value in vector]
-

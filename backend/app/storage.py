@@ -9,8 +9,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-from backend.app.domain import ChatRecord, MessageRecord, SemanticMatch
+from backend.app.domain import MessageRecord, ScenarioRecord, SemanticMatch
 from backend.settings import Settings
+
+
+class ScenarioNotFoundError(LookupError):
+    """Raised when a requested scenario does not exist."""
 
 
 class ChatRepository:
@@ -64,7 +68,6 @@ class ChatRepository:
                 ON chats(updated_at DESC)
                 """
             )
-
             if self.vector_enabled:
                 conn.execute(
                     f"""
@@ -75,9 +78,13 @@ class ChatRepository:
 
             conn.commit()
 
-    def create_chat(self, title: str | None = None, chat_id: str | None = None) -> ChatRecord:
+    def create_scenario(
+        self,
+        title: str | None = None,
+        scenario_id: str | None = None,
+    ) -> ScenarioRecord:
         now = self._now()
-        chat_id = chat_id or str(uuid.uuid4())
+        scenario_id = scenario_id or str(uuid.uuid4())
 
         with self._connect() as conn:
             conn.execute(
@@ -85,34 +92,35 @@ class ChatRepository:
                 INSERT INTO chats (id, title, created_at, updated_at)
                 VALUES (?, ?, ?, ?)
                 """,
-                (chat_id, title, now, now),
+                (scenario_id, title, now, now),
             )
             conn.commit()
 
-        chat = self.get_chat(chat_id)
-        if chat is None:
-            raise RuntimeError("Chat was not created")
-        return chat
+        scenario = self.get_scenario(scenario_id)
+        if scenario is None:
+            raise RuntimeError("Scenario was not created")
+        return scenario
 
-    def ensure_chat(self, chat_id: str | None, title: str | None = None) -> ChatRecord:
-        if chat_id:
-            existing = self.get_chat(chat_id)
-            if existing is not None:
-                return existing
-            return self.create_chat(title=title, chat_id=chat_id)
+    def require_scenario(self, scenario_id: str) -> ScenarioRecord:
+        scenario = self.get_scenario(scenario_id)
+        if scenario is None:
+            raise ScenarioNotFoundError(scenario_id)
+        return scenario
 
-        return self.create_chat(title=title)
-
-    def get_chat(self, chat_id: str) -> ChatRecord | None:
+    def get_scenario(self, scenario_id: str) -> ScenarioRecord | None:
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT id, title, created_at, updated_at FROM chats WHERE id = ?",
-                (chat_id,),
+                """
+                SELECT id, title, created_at, updated_at
+                FROM chats
+                WHERE id = ?
+                """,
+                (scenario_id,),
             ).fetchone()
 
-        return self._chat_from_row(row) if row else None
+        return self._scenario_from_row(row) if row else None
 
-    def list_chats(self, limit: int = 50) -> list[ChatRecord]:
+    def list_scenarios(self, limit: int = 50) -> list[ScenarioRecord]:
         with self._connect() as conn:
             rows = conn.execute(
                 """
@@ -124,22 +132,22 @@ class ChatRepository:
                 (limit,),
             ).fetchall()
 
-        return [self._chat_from_row(row) for row in rows]
+        return [self._scenario_from_row(row) for row in rows]
 
-    def delete_chat(self, chat_id: str) -> bool:
+    def delete_scenario(self, scenario_id: str) -> bool:
         with self._connect() as conn:
             if self.vector_enabled:
                 message_ids = [
                     row["id"]
                     for row in conn.execute(
                         "SELECT id FROM messages WHERE chat_id = ?",
-                        (chat_id,),
+                        (scenario_id,),
                     ).fetchall()
                 ]
                 for message_id in message_ids:
                     conn.execute("DELETE FROM message_vectors WHERE rowid = ?", (message_id,))
 
-            cursor = conn.execute("DELETE FROM chats WHERE id = ?", (chat_id,))
+            cursor = conn.execute("DELETE FROM chats WHERE id = ?", (scenario_id,))
             conn.commit()
 
         return cursor.rowcount > 0
@@ -344,8 +352,8 @@ class ChatRepository:
     def _serialize_vector(vector: list[float]) -> bytes:
         return struct.pack(f"{len(vector)}f", *vector)
 
-    def _chat_from_row(self, row: sqlite3.Row) -> ChatRecord:
-        return ChatRecord(
+    def _scenario_from_row(self, row: sqlite3.Row) -> ScenarioRecord:
+        return ScenarioRecord(
             id=row["id"],
             title=row["title"],
             created_at=self._parse_dt(row["created_at"]),

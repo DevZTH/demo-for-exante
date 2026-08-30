@@ -1,25 +1,25 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, Field
 
-from backend.app.domain import ChatRecord, ChatTurn, MessageRecord, SemanticMatch
+from backend.app.domain import MessageRecord, ScenarioRecord, ScenarioTurn, SemanticMatch
+
+if TYPE_CHECKING:
+    from backend.app.agent_service import AgentResponse
 
 
-class ChatCreateRequest(BaseModel):
-    title: str | None = Field(default=None, max_length=120)
-
-
-class ChatResponse(BaseModel):
+class ScenarioResponse(BaseModel):
     id: str
     title: str | None
     created_at: datetime
     updated_at: datetime
 
     @classmethod
-    def from_record(cls, record: ChatRecord) -> "ChatResponse":
+    def from_record(cls, record: ScenarioRecord) -> "ScenarioResponse":
         return cls(
             id=record.id,
             title=record.title,
@@ -42,10 +42,24 @@ class MessageResponse(BaseModel):
             id=record.id,
             chat_id=record.chat_id,
             role=record.role,
-            content=record.content,
+            content=_visible_content(record),
             created_at=record.created_at,
             metadata=record.metadata,
         )
+
+
+def _visible_content(record: MessageRecord) -> str:
+    """Do not expose the customer model's internal state as message text."""
+    if record.role != "assistant":
+        return record.content
+
+    try:
+        payload = json.loads(record.content)
+    except json.JSONDecodeError:
+        return "Ответ клиента недоступен."
+
+    reply = payload.get("reply") if isinstance(payload, dict) else None
+    return reply if isinstance(reply, str) else "Ответ клиента недоступен."
 
 
 class SemanticMatchResponse(BaseModel):
@@ -57,32 +71,6 @@ class SemanticMatchResponse(BaseModel):
         return cls(
             message=MessageResponse.from_record(match.message),
             distance=match.distance,
-        )
-
-
-class ChatRequest(BaseModel):
-    message: str = Field(min_length=1, max_length=20_000)
-    chat_id: str | None = Field(default=None, max_length=120)
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-
-class ChatTurnResponse(BaseModel):
-    chat: ChatResponse
-    user_message: MessageResponse
-    assistant_message: MessageResponse
-    context: list[SemanticMatchResponse]
-    provider: str
-    model: str
-
-    @classmethod
-    def from_turn(cls, turn: ChatTurn) -> "ChatTurnResponse":
-        return cls(
-            chat=ChatResponse.from_record(turn.chat),
-            user_message=MessageResponse.from_record(turn.user_message),
-            assistant_message=MessageResponse.from_record(turn.assistant_message),
-            context=[SemanticMatchResponse.from_match(match) for match in turn.context],
-            provider=turn.provider,
-            model=turn.model,
         )
 
 
@@ -98,43 +86,48 @@ class SettingsResponse(BaseModel):
     embedding_dimensions: int
 
 
-# Agent-specific schemas
-
-
 class AgentResponseData(BaseModel):
-    """Agent response with customer state."""
+    """Structured customer response for the EXANTE exercise."""
 
     reply: str = Field(description="Customer reply to the Relationship Manager")
-    intetions: str = Field(
-        description="Internal customer state (hidden from RM)"
-    )
+    intetions: str = Field(description="Internal customer state (hidden from RM)")
     state: Literal[
-        "curious", "considering", "interested", "evaluating", 
-        "ready_for_next_step", "ready_to_fund", "rejected"
+        "curious",
+        "considering",
+        "interested",
+        "evaluating",
+        "ready_for_next_step",
+        "ready_to_fund",
+        "rejected",
     ] = Field(description="Current customer engagement stage")
     trust: int = Field(ge=0, le=100, description="Trust level in RM (0-100)")
     purchase_probability: int = Field(
-        ge=0, le=100, description="Probability of opening account (0-100)"
+        ge=0,
+        le=100,
+        description="Probability of opening an account (0-100)",
     )
-    done: bool = Field(description="Whether conversation is complete")
+    done: bool = Field(description="Whether the conversation is complete")
 
 
-class AgentRequest(BaseModel):
-    """Request to agent with message from Relationship Manager."""
+class ScenarioTurnRequest(BaseModel):
+    """A Relationship Manager message in an EXANTE scenario."""
 
     message: str = Field(min_length=1, max_length=20_000, description="RM message")
-    chat_id: str | None = Field(
-        default=None, max_length=120, description="Agent chat session ID"
+    scenario_id: str | None = Field(
+        default=None,
+        max_length=120,
+        description="Existing scenario ID; omit it to start a scenario",
     )
     metadata: dict[str, Any] = Field(
-        default_factory=dict, description="Additional metadata"
+        default_factory=dict,
+        description="Additional message metadata",
     )
 
 
-class AgentTurnResponse(BaseModel):
-    """Complete response for an agent turn."""
+class ScenarioTurnResponse(BaseModel):
+    """A stored scenario turn and the customer evaluation signal."""
 
-    chat: ChatResponse
+    scenario: ScenarioResponse
     user_message: MessageResponse
     assistant_message: MessageResponse
     agent_response: AgentResponseData
@@ -145,21 +138,14 @@ class AgentTurnResponse(BaseModel):
     @classmethod
     def from_turn_and_agent(
         cls,
-        turn: ChatTurn,
-        agent_response: Any,  # AgentResponse from agent_service
-    ) -> "AgentTurnResponse":
+        turn: ScenarioTurn,
+        agent_response: AgentResponse,
+    ) -> "ScenarioTurnResponse":
         return cls(
-            chat=ChatResponse.from_record(turn.chat),
+            scenario=ScenarioResponse.from_record(turn.scenario),
             user_message=MessageResponse.from_record(turn.user_message),
             assistant_message=MessageResponse.from_record(turn.assistant_message),
-            agent_response=AgentResponseData(
-                reply=agent_response.reply,
-                intetions=agent_response.intetions,
-                state=agent_response.state,
-                trust=agent_response.trust,
-                purchase_probability=agent_response.purchase_probability,
-                done=agent_response.done,
-            ),
+            agent_response=AgentResponseData(**agent_response.to_dict()),
             context=[SemanticMatchResponse.from_match(match) for match in turn.context],
             provider=turn.provider,
             model=turn.model,

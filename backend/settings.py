@@ -12,7 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent
 
 
 class Settings(BaseSettings):
-    app_name: str = "LangChain Chat Backend"
+    app_name: str = "EXANTE Scenario Trainer"
     api_prefix: str = "/api/v1"
     cors_origins: list[str] = Field(
         default_factory=lambda: [
@@ -27,10 +27,10 @@ class Settings(BaseSettings):
     semantic_memory_limit: int = Field(default=6, ge=0, le=20)
     embedding_dimensions: int = Field(default=64, ge=16, le=1536)
 
-    llm_provider: Literal["ollama", "demo", "openrouter", "openai_compatible"] = "ollama"
+    llm_provider: Literal["ollama", "openrouter", "openai_compatible"] = "ollama"
     llm_model: str = "gemma4:12b"
     llm_temperature: float = Field(default=0.2, ge=0, le=2)
-    llm_timeout_seconds: float = Field(default=-1, gt=0)
+    llm_timeout_seconds: float = Field(default=60, gt=0)
 
     ollama_base_url: str = "http://localhost:11434"
 
@@ -41,11 +41,6 @@ class Settings(BaseSettings):
 
     openai_api_key: SecretStr | None = None
     openai_base_url: str = "https://api.openai.com/v1"
-
-    system_prompt: str = (
-        "You are a helpful assistant. Answer clearly and keep useful context "
-        "from the current conversation in mind."
-    )
 
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",

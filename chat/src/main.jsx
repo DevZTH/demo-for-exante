@@ -1,39 +1,22 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Bot, Menu, PanelLeftClose, SendHorizontal, Sparkles, SquarePen, User } from 'lucide-react';
 import { createRoot } from 'react-dom/client';
-import {
-  Archive,
-  Bot,
-  Check,
-  ChevronDown,
-  Copy,
-  Menu,
-  Mic,
-  PanelLeftClose,
-  Paperclip,
-  Plus,
-  Search,
-  SendHorizontal,
-  Settings,
-  Sparkles,
-  SquarePen,
-  User,
-} from 'lucide-react';
 import './styles.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000/api/v1';
 
 const suggestions = [
-  'Запомни, что меня зовут Алекс',
-  'Что ты помнишь?',
-  'О чем мой проект?',
+  'Здравствуйте, Андрей. Чем вы довольны у текущего брокера?',
+  'Какие рынки и инструменты для вас сейчас наиболее важны?',
+  'Давайте разберём комиссии и условия открытия счёта.',
 ];
 
-const DEFAULT_SCENARIO_MESSAGE = 'Здравствуйте.';
+const DEFAULT_SCENARIO_MESSAGE = 'Здравствуйте, Андрей. Я ваш Relationship Manager в EXANTE.';
 
 const welcomeMessage = {
   id: 'welcome',
   role: 'assistant',
-  text: 'Привет! Я готов к диалогу. Сообщения сохраняются в SQLite, а история подключена к LangChain memory.',
+  text: 'Начните EXANTE-сценарий: вы — Relationship Manager, а я отвечу от лица потенциального клиента.',
   time: nowTime(),
 };
 
@@ -53,16 +36,13 @@ function nowTime() {
   return formatTime();
 }
 
-function formatChatMeta(value) {
+function formatScenarioMeta(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     return '';
   }
 
-  const today = new Date();
-  const isToday = date.toDateString() === today.toDateString();
-
-  if (isToday) {
+  if (date.toDateString() === new Date().toDateString()) {
     return formatTime(date);
   }
 
@@ -72,31 +52,11 @@ function formatChatMeta(value) {
   }).format(date);
 }
 
-function extractVisibleAssistantText(content) {
-  if (!content || typeof content !== 'string') {
-    return '';
-  }
-
-  try {
-    const parsed = JSON.parse(content);
-    if (parsed && typeof parsed.reply === 'string') {
-      return parsed.reply;
-    }
-  } catch {
-    // Plain chat messages are not JSON; keep the original text.
-  }
-
-  return content;
-}
-
 function mapMessage(message) {
   return {
     id: message.id,
     role: message.role,
-    text:
-      message.role === 'assistant'
-        ? extractVisibleAssistantText(message.content)
-        : message.content,
+    text: message.content,
     time: formatTime(message.created_at),
   };
 }
@@ -124,23 +84,18 @@ async function apiFetch(path, options) {
 
 function App() {
   const [messages, setMessages] = useState([welcomeMessage]);
-  const [chats, setChats] = useState([]);
-  const [activeChatId, setActiveChatId] = useState(null);
-  const [settings, setSettings] = useState(null);
+  const [scenarios, setScenarios] = useState([]);
+  const [activeScenarioId, setActiveScenarioId] = useState(null);
   const [draft, setDraft] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState('');
-  const [mode, setMode] = useState('chat');
-  const [scenarioChatIds, setScenarioChatIds] = useState([]);
-  const textareaRef = useRef(null);
   const messagesRef = useRef(null);
 
   const canSend = draft.trim().length > 0 && !isTyping;
   const groupedMessages = useMemo(() => messages, [messages]);
-  const activeChat = chats.find((chat) => chat.id === activeChatId);
-  const activeMode = mode === 'scenario' || scenarioChatIds.includes(activeChatId);
+  const activeScenario = scenarios.find((scenario) => scenario.id === activeScenarioId);
 
   useEffect(() => {
     let ignore = false;
@@ -148,20 +103,14 @@ function App() {
     async function loadInitialState() {
       try {
         setIsLoading(true);
-        const [runtimeSettings, chatList] = await Promise.all([
-          apiFetch('/settings'),
-          apiFetch('/chats'),
-        ]);
-
+        const scenarioList = await apiFetch('/scenarios');
         if (ignore) {
           return;
         }
 
-        setSettings(runtimeSettings);
-        setChats(chatList);
-
-        if (chatList.length > 0) {
-          await selectChat(chatList[0].id, { silent: true });
+        setScenarios(scenarioList);
+        if (scenarioList.length > 0) {
+          await selectScenario(scenarioList[0].id, { silent: true });
         }
       } catch (loadError) {
         if (!ignore) {
@@ -175,7 +124,6 @@ function App() {
     }
 
     loadInitialState();
-
     return () => {
       ignore = true;
     };
@@ -188,28 +136,26 @@ function App() {
     });
   }, [messages, isTyping]);
 
-  async function refreshChats(nextActiveChatId = activeChatId) {
-    const chatList = await apiFetch('/chats');
-    setChats(chatList);
-
-    if (nextActiveChatId) {
-      setActiveChatId(nextActiveChatId);
+  async function refreshScenarios(nextActiveScenarioId = activeScenarioId) {
+    const scenarioList = await apiFetch('/scenarios');
+    setScenarios(scenarioList);
+    if (nextActiveScenarioId) {
+      setActiveScenarioId(nextActiveScenarioId);
     }
   }
 
-  async function selectChat(chatId, options = {}) {
+  async function selectScenario(scenarioId, options = {}) {
     try {
       if (!options.silent) {
         setIsLoading(true);
       }
       setError('');
-      setActiveChatId(chatId);
-      setMode(scenarioChatIds.includes(chatId) ? 'scenario' : 'chat');
-      const loadedMessages = await apiFetch(`/chats/${chatId}/messages`);
+      setActiveScenarioId(scenarioId);
+      const loadedMessages = await apiFetch(`/scenarios/${scenarioId}/messages`);
       setMessages(loadedMessages.map(mapMessage));
       setIsSidebarOpen(false);
     } catch (loadError) {
-      setError(`Не удалось загрузить чат: ${loadError.message}`);
+      setError(`Не удалось загрузить сценарий: ${loadError.message}`);
     } finally {
       if (!options.silent) {
         setIsLoading(false);
@@ -219,19 +165,13 @@ function App() {
 
   async function handleSubmit(event) {
     event.preventDefault();
-
     if (!canSend) {
       return;
     }
 
     const prompt = draft.trim();
     const optimisticId = `pending-${Date.now()}`;
-    const userMessage = {
-      id: optimisticId,
-      role: 'user',
-      text: prompt,
-      time: nowTime(),
-    };
+    const userMessage = { id: optimisticId, role: 'user', text: prompt, time: nowTime() };
 
     setMessages((current) => [...current, userMessage]);
     setDraft('');
@@ -239,46 +179,26 @@ function App() {
     setError('');
 
     try {
-      const endpoint = activeMode ? '/agent/chat' : '/chat';
-      const turn = await apiFetch(endpoint, {
+      const turn = await apiFetch('/scenarios/turns', {
         method: 'POST',
-        body: JSON.stringify({
-          chat_id: activeChatId,
-          message: prompt,
-        }),
+        body: JSON.stringify({ scenario_id: activeScenarioId, message: prompt }),
       });
 
-      if (endpoint === '/agent/chat') {
-        setScenarioChatIds((current) =>
-          current.includes(turn.chat.id) ? current : [...current, turn.chat.id],
-        );
-      }
-
-      setActiveChatId(turn.chat.id);
-      setMode(endpoint === '/agent/chat' ? 'scenario' : 'chat');
+      setActiveScenarioId(turn.scenario.id);
       setMessages((current) => {
         const savedTurn = [mapMessage(turn.user_message), mapMessage(turn.assistant_message)];
-        if (!activeChatId) {
+        if (!activeScenarioId) {
           return savedTurn;
         }
-        return [
-          ...current.filter((message) => message.id !== optimisticId),
-          ...savedTurn,
-        ];
+        return [...current.filter((message) => message.id !== optimisticId), ...savedTurn];
       });
-      await refreshChats(turn.chat.id);
+      await refreshScenarios(turn.scenario.id);
     } catch (sendError) {
       setMessages((current) => [
         ...current.filter((message) => message.id !== optimisticId),
         userMessage,
-        {
-          id: `error-${Date.now()}`,
-          role: 'assistant',
-          text: `Не удалось получить ответ backend: ${sendError.message}`,
-          time: nowTime(),
-        },
       ]);
-      setError('Проверьте, что backend запущен на 127.0.0.1:8000.');
+      setError(`Не удалось получить ответ клиента: ${sendError.message}`);
     } finally {
       setIsTyping(false);
     }
@@ -291,52 +211,23 @@ function App() {
     }
   }
 
-  function startNewChat() {
-    setMode('chat');
-    setActiveChatId(null);
-    setMessages([
-      {
-        ...welcomeMessage,
-        id: `welcome-${Date.now()}`,
-        time: nowTime(),
-      },
-    ]);
-    setDraft('');
-    setError('');
-    setIsSidebarOpen(false);
-  }
-
   async function startNewScenario() {
-    setMode('scenario');
     setError('');
     setDraft('');
     setIsTyping(true);
 
     try {
-      const turn = await apiFetch('/agent/chat', {
+      const turn = await apiFetch('/scenarios/turns', {
         method: 'POST',
-        body: JSON.stringify({
-          message: DEFAULT_SCENARIO_MESSAGE,
-          chat_id: null,
-        }),
+        body: JSON.stringify({ message: DEFAULT_SCENARIO_MESSAGE }),
       });
 
-      setScenarioChatIds((current) =>
-        current.includes(turn.chat.id) ? current : [...current, turn.chat.id],
-      );
-      setActiveChatId(turn.chat.id);
+      setActiveScenarioId(turn.scenario.id);
       setMessages([mapMessage(turn.user_message), mapMessage(turn.assistant_message)]);
-      await refreshChats(turn.chat.id);
+      await refreshScenarios(turn.scenario.id);
+      setIsSidebarOpen(false);
     } catch (scenarioError) {
-      setMessages([
-        {
-          id: `scenario-error-${Date.now()}`,
-          role: 'assistant',
-          text: `Не удалось запустить сценарий: ${scenarioError.message}`,
-          time: nowTime(),
-        },
-      ]);
-      setError('Проверьте, что backend запущен на 127.0.0.1:8000.');
+      setError(`Не удалось запустить сценарий: ${scenarioError.message}`);
     } finally {
       setIsTyping(false);
     }
@@ -346,9 +237,9 @@ function App() {
     <main className="app-shell">
       <aside className={`sidebar ${isSidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-header">
-          <button className="brand-button" aria-label="Новый чат" onClick={startNewChat}>
+          <button className="brand-button" aria-label="Новый сценарий" onClick={startNewScenario}>
             <Sparkles size={18} />
-            <span>Open Chat</span>
+            <span>EXANTE Trainer</span>
           </button>
           <button className="icon-button mobile-only" aria-label="Закрыть меню" onClick={() => setIsSidebarOpen(false)}>
             <PanelLeftClose size={18} />
@@ -356,44 +247,24 @@ function App() {
         </div>
 
         <div className="sidebar-actions">
-          <button className="new-chat-button" onClick={startNewChat}>
-            <Plus size={18} />
-            <span>Новый чат</span>
-          </button>
           <button className="new-scenario-button" onClick={startNewScenario}>
             <Sparkles size={18} />
             <span>Новый сценарий</span>
           </button>
         </div>
 
-        <label className="search-field">
-          <Search size={16} />
-          <input type="search" placeholder="Поиск" />
-        </label>
-
-        <nav className="chat-list" aria-label="История чатов">
-          {chats.map((chat) => (
+        <nav className="chat-list" aria-label="История сценариев">
+          {scenarios.map((scenario) => (
             <button
-              className={`chat-item ${chat.id === activeChatId ? 'active' : ''}`}
-              key={chat.id}
-              onClick={() => selectChat(chat.id)}
+              className={`chat-item ${scenario.id === activeScenarioId ? 'active' : ''}`}
+              key={scenario.id}
+              onClick={() => selectScenario(scenario.id)}
             >
-              <span>{chat.title || 'Новый чат'}</span>
-              <small>{formatChatMeta(chat.updated_at)}</small>
+              <span>{scenario.title || 'Новый сценарий EXANTE'}</span>
+              <small>{formatScenarioMeta(scenario.updated_at)}</small>
             </button>
           ))}
         </nav>
-
-        <div className="sidebar-footer">
-          <button className="utility-button">
-            <Archive size={17} />
-            <span>Архив</span>
-          </button>
-          <button className="utility-button">
-            <Settings size={17} />
-            <span>Настройки</span>
-          </button>
-        </div>
       </aside>
 
       <section className="chat-panel">
@@ -402,36 +273,22 @@ function App() {
             <Menu size={19} />
           </button>
 
-          <button className={`model-select ${activeMode ? 'scenario-mode' : ''}`} aria-label="Выбор модели">
+          <div className="model-select scenario-mode" aria-label="Активный сценарий">
             <span className="model-dot" />
-            <span>{activeMode ? 'EXANTE scenario' : settings?.llm_model ?? 'backend'}</span>
-            <ChevronDown size={16} />
-          </button>
+            <span>EXANTE · клиентский сценарий</span>
+          </div>
 
-          <button className="icon-button" aria-label="Новый чат" onClick={startNewChat}>
+          <button className="icon-button" aria-label="Новый сценарий" onClick={startNewScenario}>
             <SquarePen size={18} />
           </button>
         </header>
 
         <div className="messages" aria-live="polite" ref={messagesRef}>
           <div className="day-divider">
-            <span>{activeChat?.title || (activeMode ? 'Новый сценарий' : 'Новый диалог')}</span>
+            <span>{activeScenario?.title || 'Новый сценарий EXANTE'}</span>
           </div>
 
-          {isLoading && (
-            <article className="message-row assistant">
-              <div className="avatar" aria-hidden="true">
-                <Bot size={18} />
-              </div>
-              <div className="message-body compact">
-                <div className="typing">
-                  <span />
-                  <span />
-                  <span />
-                </div>
-              </div>
-            </article>
-          )}
+          {isLoading && <TypingIndicator />}
 
           {groupedMessages.map((message) => (
             <article className={`message-row ${message.role}`} key={message.id}>
@@ -440,57 +297,29 @@ function App() {
               </div>
               <div className="message-body">
                 <div className="message-meta">
-                  <strong>{message.role === 'assistant' ? 'Assistant' : 'You'}</strong>
+                  <strong>{message.role === 'assistant' ? 'Клиент' : 'Relationship Manager'}</strong>
                   <span>{message.time}</span>
                 </div>
                 <p>{message.text}</p>
-                {message.role === 'assistant' && (
-                  <div className="message-actions" aria-label="Действия сообщения">
-                    <button className="ghost-icon" aria-label="Скопировать">
-                      <Copy size={15} />
-                    </button>
-                    <button className="ghost-icon" aria-label="Принять">
-                      <Check size={15} />
-                    </button>
-                  </div>
-                )}
               </div>
             </article>
           ))}
 
           {error && (
             <article className="message-row assistant">
-              <div className="avatar" aria-hidden="true">
-                <Bot size={18} />
-              </div>
+              <div className="avatar" aria-hidden="true"><Bot size={18} /></div>
               <div className="message-body error">
-                <div className="message-meta">
-                  <strong>System</strong>
-                  <span>{nowTime()}</span>
-                </div>
+                <div className="message-meta"><strong>Система</strong><span>{nowTime()}</span></div>
                 <p>{error}</p>
               </div>
             </article>
           )}
 
-          {isTyping && (
-            <article className="message-row assistant">
-              <div className="avatar" aria-hidden="true">
-                <Bot size={18} />
-              </div>
-              <div className="message-body compact">
-                <div className="typing">
-                  <span />
-                  <span />
-                  <span />
-                </div>
-              </div>
-            </article>
-          )}
+          {isTyping && <TypingIndicator />}
         </div>
 
         <form className="composer-wrap" onSubmit={handleSubmit}>
-          <div className="suggestions" aria-label="Быстрые подсказки">
+          <div className="suggestions" aria-label="Подсказки для диалога">
             {suggestions.map((suggestion) => (
               <button type="button" key={suggestion} onClick={() => setDraft(suggestion)}>
                 {suggestion}
@@ -500,24 +329,14 @@ function App() {
 
           <div className="composer">
             <textarea
-              ref={textareaRef}
               value={draft}
               rows={1}
-              placeholder={activeMode ? 'Напишите сообщение продавцу...' : 'Напишите сообщение...'}
+              placeholder="Напишите сообщение клиенту…"
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={handleTextareaKeyDown}
             />
-
             <div className="composer-toolbar">
-              <div className="composer-actions">
-                <button className="icon-button subtle" type="button" aria-label="Прикрепить файл">
-                  <Paperclip size={18} />
-                </button>
-                <button className="icon-button subtle" type="button" aria-label="Голосовой ввод">
-                  <Mic size={18} />
-                </button>
-              </div>
-
+              <span className="composer-hint">Enter — отправить, Shift + Enter — новая строка</span>
               <button className="send-button" type="submit" disabled={!canSend} aria-label="Отправить">
                 <SendHorizontal size={18} />
               </button>
@@ -526,6 +345,17 @@ function App() {
         </form>
       </section>
     </main>
+  );
+}
+
+function TypingIndicator() {
+  return (
+    <article className="message-row assistant">
+      <div className="avatar" aria-hidden="true"><Bot size={18} /></div>
+      <div className="message-body compact">
+        <div className="typing"><span /><span /><span /></div>
+      </div>
+    </article>
   );
 }
 

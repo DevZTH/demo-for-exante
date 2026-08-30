@@ -6,7 +6,7 @@ from typing import Any
 
 
 @dataclass(frozen=True)
-class ChatRecord:
+class ScenarioRecord:
     id: str
     title: str | None
     created_at: datetime
@@ -30,11 +30,10 @@ class SemanticMatch:
 
 
 @dataclass(frozen=True)
-class ChatTurn:
-    chat: ChatRecord
+class ScenarioTurn:
+    scenario: ScenarioRecord
     user_message: MessageRecord
     assistant_message: MessageRecord
     context: list[SemanticMatch]
     provider: str
     model: str
-

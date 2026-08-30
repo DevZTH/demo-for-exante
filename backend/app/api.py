@@ -3,18 +3,14 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from backend.app.agent_service import AgentService
-from backend.app.chat_engine import ChatEngine
 from backend.app.schemas import (
-    AgentRequest,
-    AgentTurnResponse,
-    ChatCreateRequest,
-    ChatRequest,
-    ChatResponse,
-    ChatTurnResponse,
     MessageResponse,
+    ScenarioResponse,
+    ScenarioTurnRequest,
+    ScenarioTurnResponse,
     SettingsResponse,
 )
-from backend.app.storage import ChatRepository
+from backend.app.storage import ChatRepository, ScenarioNotFoundError
 from backend.settings import Settings
 
 
@@ -26,15 +22,11 @@ def get_repository(request: Request) -> ChatRepository:
     return request.app.state.repository
 
 
-def get_chat_engine(request: Request) -> ChatEngine:
-    return request.app.state.chat_engine
-
-
 def get_agent_service(request: Request) -> AgentService:
     return request.app.state.agent_service
 
 
-router = APIRouter(tags=["chat"])
+router = APIRouter(tags=["scenarios"])
 
 
 @router.get("/health", tags=["system"])
@@ -58,8 +50,6 @@ def read_settings(settings: Settings = Depends(get_settings)) -> SettingsRespons
 
 
 def _llm_endpoint(settings: Settings) -> str:
-    if settings.llm_provider == "demo":
-        return "local"
     if settings.llm_provider == "ollama":
         return settings.ollama_base_url
     if settings.llm_provider == "openrouter":
@@ -67,78 +57,65 @@ def _llm_endpoint(settings: Settings) -> str:
     return settings.openai_base_url
 
 
-@router.post("/chat", response_model=ChatTurnResponse)
-async def chat(
-    request: ChatRequest,
-    engine: ChatEngine = Depends(get_chat_engine),
-) -> ChatTurnResponse:
-    turn = await engine.ask(
-        message=request.message,
-        chat_id=request.chat_id,
-        metadata=request.metadata,
-    )
-    return ChatTurnResponse.from_turn(turn)
+@router.post("/scenarios/turns", response_model=ScenarioTurnResponse)
+async def create_scenario_turn(
+    request: ScenarioTurnRequest,
+    service: AgentService = Depends(get_agent_service),
+) -> ScenarioTurnResponse:
+    """Process one Relationship Manager message in the EXANTE scenario."""
+    try:
+        turn, agent_response = await service.process_message(
+            message=request.message,
+            chat_id=request.scenario_id,
+            metadata=request.metadata,
+        )
+    except ScenarioNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Scenario not found",
+        ) from exc
+
+    return ScenarioTurnResponse.from_turn_and_agent(turn, agent_response)
 
 
-@router.post(
-    "/chats",
-    response_model=ChatResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-def create_chat(
-    request: ChatCreateRequest,
+@router.get("/scenarios", response_model=list[ScenarioResponse])
+def list_scenarios(
     repository: ChatRepository = Depends(get_repository),
-) -> ChatResponse:
-    return ChatResponse.from_record(repository.create_chat(title=request.title))
-
-
-@router.get("/chats", response_model=list[ChatResponse])
-def list_chats(repository: ChatRepository = Depends(get_repository)) -> list[ChatResponse]:
-    return [ChatResponse.from_record(chat) for chat in repository.list_chats()]
-
-
-@router.get("/chats/{chat_id}", response_model=ChatResponse)
-def get_chat(
-    chat_id: str,
-    repository: ChatRepository = Depends(get_repository),
-) -> ChatResponse:
-    chat_record = repository.get_chat(chat_id)
-    if chat_record is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
-    return ChatResponse.from_record(chat_record)
-
-
-@router.delete("/chats/{chat_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_chat(chat_id: str, repository: ChatRepository = Depends(get_repository)) -> None:
-    if not repository.delete_chat(chat_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
-
-
-@router.get("/chats/{chat_id}/messages", response_model=list[MessageResponse])
-def list_messages(
-    chat_id: str,
-    repository: ChatRepository = Depends(get_repository),
-) -> list[MessageResponse]:
-    if repository.get_chat(chat_id) is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
+) -> list[ScenarioResponse]:
     return [
-        MessageResponse.from_record(message)
-        for message in repository.list_messages(chat_id)
+        ScenarioResponse.from_record(scenario)
+        for scenario in repository.list_scenarios()
     ]
 
 
-# Agent endpoints
+@router.get("/scenarios/{scenario_id}", response_model=ScenarioResponse)
+def get_scenario(
+    scenario_id: str,
+    repository: ChatRepository = Depends(get_repository),
+) -> ScenarioResponse:
+    scenario = repository.get_scenario(scenario_id)
+    if scenario is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scenario not found")
+    return ScenarioResponse.from_record(scenario)
 
 
-@router.post("/agent/chat", response_model=AgentTurnResponse, tags=["agent"])
-async def agent_chat(
-    request: AgentRequest,
-    service: AgentService = Depends(get_agent_service),
-) -> AgentTurnResponse:
-    """Process message in agent simulation (customer role in EXANTE sales scenario)."""
-    turn, agent_response = await service.process_message(
-        message=request.message,
-        chat_id=request.chat_id,
-        metadata=request.metadata,
-    )
-    return AgentTurnResponse.from_turn_and_agent(turn, agent_response)
+@router.delete("/scenarios/{scenario_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_scenario(
+    scenario_id: str,
+    repository: ChatRepository = Depends(get_repository),
+) -> None:
+    if not repository.delete_scenario(scenario_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scenario not found")
+
+
+@router.get("/scenarios/{scenario_id}/messages", response_model=list[MessageResponse])
+def list_scenario_messages(
+    scenario_id: str,
+    repository: ChatRepository = Depends(get_repository),
+) -> list[MessageResponse]:
+    if repository.get_scenario(scenario_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scenario not found")
+    return [
+        MessageResponse.from_record(message)
+        for message in repository.list_messages(scenario_id)
+    ]

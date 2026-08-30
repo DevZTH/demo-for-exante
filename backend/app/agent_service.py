@@ -8,12 +8,25 @@ from typing import Any
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
-from backend.app.domain import ChatTurn, MessageRecord, SemanticMatch
-from backend.app.embeddings import HashEmbeddings
-from backend.app.memory import SQLiteChatMessageHistory
+from backend.app.domain import MessageRecord, ScenarioTurn, SemanticMatch
+from backend.app.embeddings import LocalHashEmbeddings
+from backend.app.memory import SQLiteScenarioMessageHistory
 from backend.app.providers import build_chat_model
-from backend.app.storage import ChatRepository
+from backend.app.storage import ChatRepository, ScenarioNotFoundError
 from backend.settings import Settings
+
+
+AGENT_STATES = frozenset(
+    {
+        "curious",
+        "considering",
+        "interested",
+        "evaluating",
+        "ready_for_next_step",
+        "ready_to_fund",
+        "rejected",
+    }
+)
 
 
 class AgentResponse:
@@ -54,13 +67,32 @@ class AgentResponse:
     def from_json(json_str: str) -> AgentResponse:
         """Parse from JSON string."""
         data = json.loads(json_str)
+        if not isinstance(data, dict):
+            raise ValueError("Agent response must be a JSON object")
+
+        state = data.get("state", "considering")
+        if state not in AGENT_STATES:
+            raise ValueError(f"Unsupported agent state: {state}")
+
+        done = data.get("done", False)
+        if not isinstance(done, bool):
+            raise ValueError("Agent field 'done' must be boolean")
+
+        reply = data.get("reply", "")
+        intetions = data.get("intetions", "")
+        if not isinstance(reply, str) or not isinstance(intetions, str):
+            raise ValueError("Agent fields 'reply' and 'intetions' must be strings")
+
         return AgentResponse(
-            reply=data.get("reply", ""),
-            intetions=data.get("intetions", ""),
-            state=data.get("state", "considering"),
-            trust=int(data.get("trust", 50)),
-            purchase_probability=int(data.get("purchase_probability", 30)),
-            done=bool(data.get("done", False)),
+            reply=reply,
+            intetions=intetions,
+            state=state,
+            trust=max(0, min(100, int(data.get("trust", 50)))),
+            purchase_probability=max(
+                0,
+                min(100, int(data.get("purchase_probability", 30))),
+            ),
+            done=done,
         )
 
 
@@ -70,7 +102,7 @@ class AgentService:
     def __init__(self, settings: Settings, repository: ChatRepository) -> None:
         self.settings = settings
         self.repository = repository
-        self.embeddings = HashEmbeddings(settings.embedding_dimensions)
+        self.embeddings = LocalHashEmbeddings(settings.embedding_dimensions)
         self.llm = build_chat_model(settings)
         self.chain = self._build_chain()
 
@@ -80,27 +112,31 @@ class AgentService:
         message: str,
         chat_id: str | None = None,
         metadata: dict[str, object] | None = None,
-    ) -> tuple[ChatTurn, AgentResponse]:
+    ) -> tuple[ScenarioTurn, AgentResponse]:
         """
         Process message from Relationship Manager and return agent response.
         
         Returns:
-            Tuple of (ChatTurn for storage, AgentResponse with agent state)
+            Tuple of (ScenarioTurn for storage, AgentResponse with agent state)
         """
-        chat = self.repository.ensure_chat(chat_id, title=self._title_from(message))
+        scenario = (
+            self.repository.require_scenario(chat_id)
+            if chat_id
+            else self.repository.create_scenario(title=self._title_from(message))
+        )
         query_embedding = self.embeddings.embed_query(message)
-        semantic_context = self._semantic_context(chat.id, query_embedding)
+        semantic_context = self._semantic_context(scenario.id, query_embedding)
         
-        history = SQLiteChatMessageHistory(
+        history = SQLiteScenarioMessageHistory(
             repository=self.repository,
-            chat_id=chat.id,
+            chat_id=scenario.id,
             history_limit=self.settings.history_window_messages,
             embeddings=self.embeddings,
             user_metadata=metadata,
             assistant_metadata={
                 "provider": self.settings.llm_provider,
                 "model": self.settings.llm_model,
-                "mode": "agent",
+                "scenario": "exante-sales",
             },
         )
 
@@ -139,12 +175,12 @@ class AgentService:
         
         user_message, assistant_message = self._saved_turn(history.added_records)
 
-        updated_chat = self.repository.get_chat(chat.id)
-        if updated_chat is None:
-            raise RuntimeError("Chat disappeared after writing messages")
+        updated_scenario = self.repository.get_scenario(scenario.id)
+        if updated_scenario is None:
+            raise ScenarioNotFoundError(scenario.id)
 
-        chat_turn = ChatTurn(
-            chat=updated_chat,
+        scenario_turn = ScenarioTurn(
+            scenario=updated_scenario,
             user_message=user_message,
             assistant_message=assistant_message,
             context=semantic_context,
@@ -152,7 +188,7 @@ class AgentService:
             model=self.settings.llm_model,
         )
 
-        return chat_turn, agent_response
+        return scenario_turn, agent_response
 
     def _build_chain(self):
         """Build the LangChain chain for agent responses."""
@@ -261,7 +297,7 @@ class AgentService:
             return "Нет более ранних релевантных сообщений."
 
         return "\n".join(
-            f"- {match.message.role}: {match.message.content}"
+            f"- {match.message.role}: {_visible_context_content(match.message)}"
             for match in matches
         )
 
@@ -293,4 +329,14 @@ class AgentService:
     def _title_from(message: str) -> str:
         """Generate chat title from first message."""
         compact = " ".join(message.split())
-        return compact[:80] or "New agent chat"
+        return compact[:80] or "Новый сценарий EXANTE"
+
+
+def _visible_context_content(message: MessageRecord) -> str:
+    if message.role != "assistant":
+        return message.content
+
+    try:
+        return AgentResponse.from_json(message.content).reply
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return "Ответ клиента из предыдущего сообщения недоступен."

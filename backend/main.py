@@ -7,7 +7,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.agent_service import AgentService
 from backend.app.api import router
-from backend.app.chat_engine import ChatEngine
 from backend.app.storage import ChatRepository
 from backend.settings import get_settings
 
@@ -20,7 +19,6 @@ async def lifespan(app: FastAPI):
 
     app.state.settings = settings
     app.state.repository = repository
-    app.state.chat_engine = ChatEngine(settings, repository)
     app.state.agent_service = AgentService(settings, repository)
 
     yield
@@ -31,7 +29,7 @@ settings = get_settings()
 app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
-    description="FastAPI + LangChain chat demo with SQLite and sqlite-vec memory.",
+    description="EXANTE scenario trainer with SQLite and sqlite-vec memory.",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",

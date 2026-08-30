@@ -8,14 +8,14 @@
 
 Для frontend используется путь:
 
-POST /api/v1/agent/chat
+POST /api/v1/scenarios/turns
 
 ### Пример запроса
 
 ```json
 {
   "message": "Здравствуйте, я интересуюсь вашим брокером.",
-  "chat_id": "session_123"
+  "scenario_id": "session_123"
 }
 ```
 
@@ -23,7 +23,7 @@ POST /api/v1/agent/chat
 
 ```json
 {
-  "chat": {
+  "scenario": {
     "id": "session_123",
     "title": "Здравствуйте, я интересуюсь вашим брокером.",
     "created_at": "2026-08-29T00:00:00",
@@ -41,7 +41,7 @@ POST /api/v1/agent/chat
     "id": 2,
     "chat_id": "session_123",
     "role": "assistant",
-    "content": "{\"reply\":\"Привет. Я смотрел на EXANTE, но пока не понимаю, зачем мне менять текущего брокера.\",\"intetions\":\"Клиент заинтересовался, но пока не видит явной ценности. Доверие нейтральное.\",\"state\":\"curious\",\"trust\":52,\"purchase_probability\":32,\"done\":false}",
+    "content": "Привет. Я смотрел на EXANTE, но пока не понимаю, зачем мне менять текущего брокера.",
     "created_at": "2026-08-29T00:00:00",
     "metadata": {}
   },
@@ -221,15 +221,15 @@ Frontend должен показывать пользователю только
 ## 7. Пример frontend-кода
 
 ```javascript
-async function sendAgentMessage(message, chatId) {
-  const response = await fetch('/api/v1/agent/chat', {
+async function sendScenarioMessage(message, scenarioId) {
+  const response = await fetch('/api/v1/scenarios/turns', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
       message,
-      chat_id: chatId,
+      scenario_id: scenarioId,
     }),
   });
 

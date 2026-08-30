@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from typing import Any
 
@@ -11,8 +12,8 @@ from backend.app.domain import MessageRecord
 from backend.app.storage import ChatRepository
 
 
-class SQLiteChatMessageHistory(BaseChatMessageHistory):
-    """LangChain chat history backed by the project SQLite repository."""
+class SQLiteScenarioMessageHistory(BaseChatMessageHistory):
+    """LangChain scenario history backed by the project SQLite repository."""
 
     def __init__(
         self,
@@ -45,7 +46,8 @@ class SQLiteChatMessageHistory(BaseChatMessageHistory):
             role = role_from_langchain_message(message)
             content = content_from_langchain_message(message)
             metadata = self._metadata_for(role)
-            embedding = self.embeddings.embed_query(content) if content else None
+            embedding_content = visible_content_for_role(role, content)
+            embedding = self.embeddings.embed_query(embedding_content) if embedding_content else None
 
             self.added_records.append(
                 self.repository.add_message(
@@ -74,7 +76,7 @@ def to_langchain_message(record: MessageRecord) -> BaseMessage:
     if record.role == "user":
         return HumanMessage(content=record.content)
     if record.role == "assistant":
-        return AIMessage(content=record.content)
+        return AIMessage(content=visible_content_for_role(record.role, record.content))
     if record.role == "system":
         return SystemMessage(content=record.content)
     raise ValueError(f"Unsupported message role: {record.role}")
@@ -104,3 +106,16 @@ def content_from_langchain_message(message: BaseMessage) -> str:
     if isinstance(content, list):
         return "\n".join(str(item) for item in content)
     return str(content)
+
+
+def visible_content_for_role(role: str, content: str) -> str:
+    if role != "assistant":
+        return content
+
+    try:
+        payload = json.loads(content)
+    except json.JSONDecodeError:
+        return "Ответ клиента из предыдущего сообщения недоступен."
+
+    reply = payload.get("reply") if isinstance(payload, dict) else None
+    return reply if isinstance(reply, str) else "Ответ клиента из предыдущего сообщения недоступен."
