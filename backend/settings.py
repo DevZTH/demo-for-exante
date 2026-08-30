@@ -28,9 +28,9 @@ class Settings(BaseSettings):
     embedding_dimensions: int = Field(default=64, ge=16, le=1536)
 
     llm_provider: Literal["ollama", "demo", "openrouter", "openai_compatible"] = "ollama"
-    llm_model: str = "gemma4:e2b"
+    llm_model: str = "gemma4:12b"
     llm_temperature: float = Field(default=0.2, ge=0, le=2)
-    llm_timeout_seconds: float = Field(default=60, gt=0)
+    llm_timeout_seconds: float = Field(default=-1, gt=0)
 
     ollama_base_url: str = "http://localhost:11434"
 

@@ -28,6 +28,8 @@ const suggestions = [
   'О чем мой проект?',
 ];
 
+const DEFAULT_SCENARIO_MESSAGE = 'Здравствуйте.';
+
 const welcomeMessage = {
   id: 'welcome',
   role: 'assistant',
@@ -70,11 +72,31 @@ function formatChatMeta(value) {
   }).format(date);
 }
 
+function extractVisibleAssistantText(content) {
+  if (!content || typeof content !== 'string') {
+    return '';
+  }
+
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed && typeof parsed.reply === 'string') {
+      return parsed.reply;
+    }
+  } catch {
+    // Plain chat messages are not JSON; keep the original text.
+  }
+
+  return content;
+}
+
 function mapMessage(message) {
   return {
     id: message.id,
     role: message.role,
-    text: message.content,
+    text:
+      message.role === 'assistant'
+        ? extractVisibleAssistantText(message.content)
+        : message.content,
     time: formatTime(message.created_at),
   };
 }
@@ -110,13 +132,15 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState('');
+  const [mode, setMode] = useState('chat');
+  const [scenarioChatIds, setScenarioChatIds] = useState([]);
   const textareaRef = useRef(null);
   const messagesRef = useRef(null);
 
   const canSend = draft.trim().length > 0 && !isTyping;
-
   const groupedMessages = useMemo(() => messages, [messages]);
   const activeChat = chats.find((chat) => chat.id === activeChatId);
+  const activeMode = mode === 'scenario' || scenarioChatIds.includes(activeChatId);
 
   useEffect(() => {
     let ignore = false;
@@ -180,6 +204,7 @@ function App() {
       }
       setError('');
       setActiveChatId(chatId);
+      setMode(scenarioChatIds.includes(chatId) ? 'scenario' : 'chat');
       const loadedMessages = await apiFetch(`/chats/${chatId}/messages`);
       setMessages(loadedMessages.map(mapMessage));
       setIsSidebarOpen(false);
@@ -214,7 +239,8 @@ function App() {
     setError('');
 
     try {
-      const turn = await apiFetch('/chat', {
+      const endpoint = activeMode ? '/agent/chat' : '/chat';
+      const turn = await apiFetch(endpoint, {
         method: 'POST',
         body: JSON.stringify({
           chat_id: activeChatId,
@@ -222,7 +248,14 @@ function App() {
         }),
       });
 
+      if (endpoint === '/agent/chat') {
+        setScenarioChatIds((current) =>
+          current.includes(turn.chat.id) ? current : [...current, turn.chat.id],
+        );
+      }
+
       setActiveChatId(turn.chat.id);
+      setMode(endpoint === '/agent/chat' ? 'scenario' : 'chat');
       setMessages((current) => {
         const savedTurn = [mapMessage(turn.user_message), mapMessage(turn.assistant_message)];
         if (!activeChatId) {
@@ -248,7 +281,6 @@ function App() {
       setError('Проверьте, что backend запущен на 127.0.0.1:8000.');
     } finally {
       setIsTyping(false);
-      textareaRef.current?.focus();
     }
   }
 
@@ -260,6 +292,7 @@ function App() {
   }
 
   function startNewChat() {
+    setMode('chat');
     setActiveChatId(null);
     setMessages([
       {
@@ -271,6 +304,42 @@ function App() {
     setDraft('');
     setError('');
     setIsSidebarOpen(false);
+  }
+
+  async function startNewScenario() {
+    setMode('scenario');
+    setError('');
+    setDraft('');
+    setIsTyping(true);
+
+    try {
+      const turn = await apiFetch('/agent/chat', {
+        method: 'POST',
+        body: JSON.stringify({
+          message: DEFAULT_SCENARIO_MESSAGE,
+          chat_id: null,
+        }),
+      });
+
+      setScenarioChatIds((current) =>
+        current.includes(turn.chat.id) ? current : [...current, turn.chat.id],
+      );
+      setActiveChatId(turn.chat.id);
+      setMessages([mapMessage(turn.user_message), mapMessage(turn.assistant_message)]);
+      await refreshChats(turn.chat.id);
+    } catch (scenarioError) {
+      setMessages([
+        {
+          id: `scenario-error-${Date.now()}`,
+          role: 'assistant',
+          text: `Не удалось запустить сценарий: ${scenarioError.message}`,
+          time: nowTime(),
+        },
+      ]);
+      setError('Проверьте, что backend запущен на 127.0.0.1:8000.');
+    } finally {
+      setIsTyping(false);
+    }
   }
 
   return (
@@ -286,10 +355,16 @@ function App() {
           </button>
         </div>
 
-        <button className="new-chat-button" onClick={startNewChat}>
-          <Plus size={18} />
-          <span>Новый чат</span>
-        </button>
+        <div className="sidebar-actions">
+          <button className="new-chat-button" onClick={startNewChat}>
+            <Plus size={18} />
+            <span>Новый чат</span>
+          </button>
+          <button className="new-scenario-button" onClick={startNewScenario}>
+            <Sparkles size={18} />
+            <span>Новый сценарий</span>
+          </button>
+        </div>
 
         <label className="search-field">
           <Search size={16} />
@@ -327,9 +402,9 @@ function App() {
             <Menu size={19} />
           </button>
 
-          <button className="model-select" aria-label="Выбор модели">
+          <button className={`model-select ${activeMode ? 'scenario-mode' : ''}`} aria-label="Выбор модели">
             <span className="model-dot" />
-            <span>{settings?.llm_model ?? 'backend'}</span>
+            <span>{activeMode ? 'EXANTE scenario' : settings?.llm_model ?? 'backend'}</span>
             <ChevronDown size={16} />
           </button>
 
@@ -340,7 +415,7 @@ function App() {
 
         <div className="messages" aria-live="polite" ref={messagesRef}>
           <div className="day-divider">
-            <span>{activeChat?.title || 'Новый диалог'}</span>
+            <span>{activeChat?.title || (activeMode ? 'Новый сценарий' : 'Новый диалог')}</span>
           </div>
 
           {isLoading && (
@@ -428,7 +503,7 @@ function App() {
               ref={textareaRef}
               value={draft}
               rows={1}
-              placeholder="Напишите сообщение..."
+              placeholder={activeMode ? 'Напишите сообщение продавцу...' : 'Напишите сообщение...'}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={handleTextareaKeyDown}
             />

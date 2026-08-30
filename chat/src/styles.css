@@ -59,8 +59,14 @@ button {
   justify-content: space-between;
 }
 
+.sidebar-actions {
+  display: grid;
+  gap: 8px;
+}
+
 .brand-button,
 .new-chat-button,
+.new-scenario-button,
 .utility-button,
 .chat-item,
 .model-select,
@@ -78,6 +84,33 @@ button {
     color 160ms ease;
 }
 
+.new-chat-button,
+.new-scenario-button {
+  width: 100%;
+  justify-content: center;
+  padding: 0 12px;
+  font-weight: 650;
+}
+
+.new-chat-button {
+  background: #f4f4f5;
+  color: #111111;
+}
+
+.new-chat-button:hover {
+  background: #e4e4e7;
+}
+
+.new-scenario-button {
+  background: rgba(167, 139, 250, 0.18);
+  border: 1px solid rgba(167, 139, 250, 0.45);
+  color: #e9d5ff;
+}
+
+.new-scenario-button:hover {
+  background: rgba(167, 139, 250, 0.25);
+}
+
 .brand-button {
   padding: 0 8px;
   background: transparent;
@@ -86,19 +119,6 @@ button {
 
 .brand-button svg {
   color: #a7f3d0;
-}
-
-.new-chat-button {
-  width: 100%;
-  justify-content: center;
-  padding: 0 12px;
-  background: #f4f4f5;
-  color: #111111;
-  font-weight: 650;
-}
-
-.new-chat-button:hover {
-  background: #e4e4e7;
 }
 
 .search-field {
@@ -207,6 +227,12 @@ button {
   background: #181818;
   border: 1px solid #2f2f2f;
   font-weight: 650;
+}
+
+.model-select.scenario-mode {
+  background: rgba(167, 139, 250, 0.18);
+  border-color: rgba(167, 139, 250, 0.45);
+  color: #f3e8ff;
 }
 
 .model-select span:not(.model-dot) {
