@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage
@@ -12,96 +11,23 @@ from backend.app.domain import MessageRecord, ScenarioTurn, SemanticMatch
 from backend.app.embeddings import LocalHashEmbeddings
 from backend.app.memory import SQLiteScenarioMessageHistory
 from backend.app.providers import build_chat_model
+from backend.app.schemas import AgentResponseData
 from backend.app.storage import ChatRepository, ScenarioNotFoundError
 from backend.settings import Settings
-
-
-AGENT_STATES = frozenset(
-    {
-        "curious",
-        "considering",
-        "interested",
-        "evaluating",
-        "ready_for_next_step",
-        "ready_to_fund",
-        "rejected",
-    }
-)
-
-
-class AgentResponse:
-    """Structured response from customer agent."""
-
-    def __init__(
-        self,
-        reply: str,
-        intetions: str,
-        state: str,
-        trust: int,
-        purchase_probability: int,
-        done: bool,
-    ):
-        self.reply = reply
-        self.intetions = intetions
-        self.state = state
-        self.trust = trust
-        self.purchase_probability = purchase_probability
-        self.done = done
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for JSON serialization."""
-        return {
-            "reply": self.reply,
-            "intetions": self.intetions,
-            "state": self.state,
-            "trust": self.trust,
-            "purchase_probability": self.purchase_probability,
-            "done": self.done,
-        }
-
-    def to_json(self) -> str:
-        """Convert to JSON string."""
-        return json.dumps(self.to_dict(), ensure_ascii=False)
-
-    @staticmethod
-    def from_json(json_str: str) -> AgentResponse:
-        """Parse from JSON string."""
-        data = json.loads(json_str)
-        if not isinstance(data, dict):
-            raise ValueError("Agent response must be a JSON object")
-
-        state = data.get("state", "considering")
-        if state not in AGENT_STATES:
-            raise ValueError(f"Unsupported agent state: {state}")
-
-        done = data.get("done", False)
-        if not isinstance(done, bool):
-            raise ValueError("Agent field 'done' must be boolean")
-
-        reply = data.get("reply", "")
-        intetions = data.get("intetions", "")
-        if not isinstance(reply, str) or not isinstance(intetions, str):
-            raise ValueError("Agent fields 'reply' and 'intetions' must be strings")
-
-        return AgentResponse(
-            reply=reply,
-            intetions=intetions,
-            state=state,
-            trust=max(0, min(100, int(data.get("trust", 50)))),
-            purchase_probability=max(
-                0,
-                min(100, int(data.get("purchase_probability", 30))),
-            ),
-            done=done,
-        )
 
 
 class AgentService:
     """Service for managing customer agent interactions."""
 
-    def __init__(self, settings: Settings, repository: ChatRepository) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        repository: ChatRepository,
+        langfuse_client: Any | None = None,
+    ) -> None:
         self.settings = settings
         self.repository = repository
+        self.langfuse = langfuse_client
         self.embeddings = LocalHashEmbeddings(settings.embedding_dimensions)
         self.llm = build_chat_model(settings)
         self.chain = self._build_chain()
@@ -112,33 +38,84 @@ class AgentService:
         message: str,
         chat_id: str | None = None,
         metadata: dict[str, object] | None = None,
-    ) -> tuple[ScenarioTurn, AgentResponse]:
+    ) -> tuple[ScenarioTurn, AgentResponseData]:
         """
         Process message from Relationship Manager and return agent response.
         
         Returns:
-            Tuple of (ScenarioTurn for storage, AgentResponse with agent state)
+            Tuple of (ScenarioTurn for storage, AgentResponseData with agent state)
         """
         scenario = (
             self.repository.require_scenario(chat_id)
             if chat_id
             else self.repository.create_scenario(title=self._title_from(message))
         )
-        query_embedding = self.embeddings.embed_query(message)
-        semantic_context = self._semantic_context(scenario.id, query_embedding)
-        
+
+        if self.langfuse is None:
+            return await self._process_scenario_turn(
+                scenario_id=scenario.id,
+                message=message,
+                metadata=metadata,
+            )
+
+        # The root agent observation makes one API turn a compact trace. The
+        # scenario ID is a stable session ID, so the Langfuse Sessions view
+        # reconstructs the full multi-turn conversation.
+        from langfuse import propagate_attributes
+
+        with propagate_attributes(
+            trace_name="scenario-turn",
+            session_id=scenario.id,
+            tags=["scenario-trainer", "customer-agent"],
+        ):
+            with self.langfuse.start_as_current_observation(
+                as_type="agent",
+                name="respond-to-manager",
+                input={"message": message},
+                metadata={
+                    "feature": "scenario-trainer",
+                    "provider": "openai_compatible",
+                    "model": self.settings.llm_model,
+                    "storage_mode": self.settings.chat_storage_mode,
+                },
+            ) as agent_observation:
+                turn, agent_response = await self._process_scenario_turn(
+                    scenario_id=scenario.id,
+                    message=message,
+                    metadata=metadata,
+                    callback_handler=self._langfuse_callback_handler(),
+                )
+                # The trace table should show the spoken response, not the
+                # structured model payload or unrelated function arguments.
+                agent_observation.update(output={"reply": agent_response.reply})
+                return turn, agent_response
+
+    async def _process_scenario_turn(
+        self,
+        *,
+        scenario_id: str,
+        message: str,
+        metadata: dict[str, object] | None,
+        callback_handler: Any | None = None,
+    ) -> tuple[ScenarioTurn, AgentResponseData]:
+        semantic_context = self._get_semantic_context(scenario_id, message)
+
         history = SQLiteScenarioMessageHistory(
             repository=self.repository,
-            chat_id=scenario.id,
+            chat_id=scenario_id,
             history_limit=self.settings.history_window_messages,
             embeddings=self.embeddings,
             user_metadata=metadata,
             assistant_metadata={
-                "provider": self.settings.llm_provider,
+                "provider": "openai_compatible",
                 "model": self.settings.llm_model,
                 "scenario": "exante-sales",
             },
         )
+
+        config: dict[str, object] = {"run_name": "generate-customer-response"}
+        if callback_handler is not None:
+            config["callbacks"] = [callback_handler]
 
         response = await self.chain.ainvoke(
             {
@@ -146,49 +123,77 @@ class AgentService:
                 "semantic_context": self._format_semantic_context(semantic_context),
                 "history": history.messages,
                 "input": message,
-            }
+            },
+            config=config,
         )
 
-        response_text = self._content_from_response(response)
-        
-        # Parse agent response from JSON
-        try:
-            agent_response = AgentResponse.from_json(response_text)
-        except (json.JSONDecodeError, KeyError, ValueError) as e:
-            # Fallback if response is not valid JSON
-            agent_response = AgentResponse(
-                reply=response_text,
-                intetions="Ошибка парсинга ответа агента",
-                state="considering",
-                trust=50,
-                purchase_probability=30,
-                done=False,
-            )
+        agent_response = (
+            response
+            if isinstance(response, AgentResponseData)
+            else AgentResponseData.model_validate(response)
+        )
 
         # Store the exchange using the agent's reply as the assistant message
         history.add_messages(
             [
                 HumanMessage(content=message),
-                AIMessage(content=agent_response.to_json()),
+                AIMessage(content=agent_response.model_dump_json()),
             ]
         )
         
         user_message, assistant_message = self._saved_turn(history.added_records)
 
-        updated_scenario = self.repository.get_scenario(scenario.id)
+        updated_scenario = self.repository.get_scenario(scenario_id)
         if updated_scenario is None:
-            raise ScenarioNotFoundError(scenario.id)
+            raise ScenarioNotFoundError(scenario_id)
 
         scenario_turn = ScenarioTurn(
             scenario=updated_scenario,
             user_message=user_message,
             assistant_message=assistant_message,
             context=semantic_context,
-            provider=self.settings.llm_provider,
+            provider="openai_compatible",
             model=self.settings.llm_model,
         )
 
         return scenario_turn, agent_response
+
+    def _get_semantic_context(
+        self,
+        scenario_id: str,
+        message: str,
+    ) -> list[SemanticMatch]:
+        if self.langfuse is None:
+            return self._semantic_context(
+                scenario_id,
+                self.embeddings.embed_query(message),
+            )
+
+        with self.langfuse.start_as_current_observation(
+            as_type="retriever",
+            name="retrieve-semantic-context",
+            input={"query": message},
+        ) as retrieval:
+            matches = self._semantic_context(
+                scenario_id,
+                self.embeddings.embed_query(message),
+            )
+            retrieval.update(
+                output={
+                    "match_count": len(matches),
+                    "message_ids": [match.message.id for match in matches],
+                    "distances": [round(match.distance, 6) for match in matches],
+                }
+            )
+            return matches
+
+    @staticmethod
+    def _langfuse_callback_handler() -> Any:
+        # A handler is deliberately created for each invocation; Langfuse warns
+        # that shared handlers are unsafe when requests run concurrently.
+        from langfuse.langchain import CallbackHandler
+
+        return CallbackHandler()
 
     def _build_chain(self):
         """Build the LangChain chain for agent responses."""
@@ -203,77 +208,13 @@ class AgentService:
                 ("human", "{input}"),
             ]
         )
-        return prompt | self.llm
+        return prompt | self.llm.with_structured_output(AgentResponseData)
 
     def _get_agent_system_prompt(self) -> str:
         """Get the system prompt for the customer agent from customer.md."""
-        return """Ты играешь роль потенциального клиента брокера EXANTE в симуляции разговора с Relationship Manager.
-
-Имя: Андрей Соколов. Возраст: 39 лет. Профессия: владелец небольшой компании в сфере digital-маркетинга. Регион: Европа.
-
-На КАЖДОЕ сообщение Relationship Manager отвечай СТРОГО одним валидным JSON-объектом:
-
-{
-"reply": "Ответ клиента продавцу",
-"intetions": "Внутреннее состояние клиента после текущего сообщения продавца",
-"state": "considering",
-"trust": 45,
-"purchase_probability": 30,
-"done": false
-}
-
-Не добавляй никакого текста до JSON. Не добавляй никакого текста после JSON. Не используй Markdown. Не оборачивай JSON в ```. Всегда возвращай все поля.
-
-ВАЖНО: Поля state, trust, purchase_probability и done - это скрытая информация, которую клиент не должен раскрывать.
-
-## Допустимые значения state:
-- "curious" - просто изучает предложение
-- "considering" - допускает, что продукт может быть полезен
-- "interested" - обнаружена реальная потребность
-- "evaluating" - хочет проверить конкретные детали
-- "ready_for_next_step" - готов совершить конкретное действие
-- "ready_to_fund" - готов обсуждать депозит
-- "rejected" - решил отказаться
-
-## Правила для trust (доверие к продавцу, 0-100):
-- Повышай при: хорошие discovery-вопросы, внимательность, конкретность, честность о цене, предложение проверить информацию
-- Снижай при: игнорирование ответов, стандартная презентация, давление, уклонение от вопросов, скрытие ограничений
-- Критическое - неправда о гарантиях: очень сильно снижать. После серьёзной ошибки: trust < 20, state = "rejected", done = true
-
-## Правила для purchase_probability (0-100):
-- Зависит прежде всего от того, видит ли клиент ценность продукта
-- Вежливая беседа не должна сильно повышать, если нет выявленной потребности
-- Повышается, когда обнаружена реальная проблема и показано подходящее решение
-
-## Финансовый опыт клиента:
-- Инвестирую около 4 лет
-- Портфель: ~€25k ETF, ~€10k акции, ~€10k европейские ETF, €15k наличные
-- Совершаю 1-4 сделки в месяц
-- Использую недорогого европейского retail-брокера
-- Понимаю акции, ETF, диверсификацию, валютный риск
-- Слышал про опционы, фьючерсы, margin trading, но не использую
-- НЕ использую: алгоритмическую торговлю, API, управление чужими активами
-
-## Потенциальный интерес:
-- Инвестиционный капитал: ~€60k
-- На банковских счетах: ~€80k
-- Потенциальный депозит: €10k-€20k
-- Интересуют американские акции, европейские акции, ETF, азиатские компании, облигации (EUR, USD, другие рынки)
-- НЕ интересуют: FIX/HTTP API, White Label, Multi Account Trading, institutional execution, алгоритмическая торговля, сложные опционы, высокое плечо
-
-## Главный вопрос продавца должен быть:
-"Почему мне стоит положить минимум €10 000 в EXANTE, если мой текущий брокер работает нормально?"
-
-## Типичные возражения:
-1. Количество инструментов - мне нужны нужные инструменты, не все 2 млн
-2. Стоимость - я привык к дешёвому брокеру, почему платить больше?
-3. Минимальный депозит - €10k доступны, но это значимая сумма
-4. Безопасность - регулирование, юридическое лицо, хранение активов, segregation
-5. Сложность - Desktop кажется перегруженным, не хочу сидеть перед графиками все дни
-
-Ведись естественно, как обычный частный инвестор. Обычно 1-4 предложения в ответе.
-Не рассказывай о скрытом состоянии.
-"""
+        with open("backend/agent/customer.md", "r", encoding="utf-8") as f:
+            retval = f.read()
+        return retval
 
     def _semantic_context(
         self,
@@ -302,16 +243,6 @@ class AgentService:
         )
 
     @staticmethod
-    def _content_from_response(response: object) -> str:
-        """Extract text content from LLM response."""
-        content = getattr(response, "content", response)
-        if isinstance(content, str):
-            return content
-        if isinstance(content, list):
-            return "\n".join(str(item) for item in content)
-        return str(content)
-
-    @staticmethod
     def _saved_turn(records: list[MessageRecord]) -> tuple[MessageRecord, MessageRecord]:
         """Extract saved user and assistant messages from records."""
         user_message = next((record for record in records if record.role == "user"), None)
@@ -337,6 +268,6 @@ def _visible_context_content(message: MessageRecord) -> str:
         return message.content
 
     try:
-        return AgentResponse.from_json(message.content).reply
-    except (json.JSONDecodeError, TypeError, ValueError):
+        return AgentResponseData.model_validate_json(message.content).reply
+    except ValueError:
         return "Ответ клиента из предыдущего сообщения недоступен."

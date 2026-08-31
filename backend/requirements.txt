@@ -1,9 +1,9 @@
 fastapi>=0.115
 uvicorn[standard]>=0.30
 pydantic-settings>=2.4
+python-dotenv>=1.0
 langchain-core>=0.3
+langchain>=1.0
 langchain-openai>=0.3
-langchain-openrouter>=0.0.1
-langchain-ollama>=0.2
+langfuse>=4.0
 sqlite-vec>=0.1.6
-

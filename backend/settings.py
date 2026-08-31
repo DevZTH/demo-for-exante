@@ -27,20 +27,41 @@ class Settings(BaseSettings):
     semantic_memory_limit: int = Field(default=6, ge=0, le=20)
     embedding_dimensions: int = Field(default=64, ge=16, le=1536)
 
-    llm_provider: Literal["ollama", "openrouter", "openai_compatible"] = "ollama"
     llm_model: str = "gemma4:12b"
     llm_temperature: float = Field(default=0.2, ge=0, le=2)
     llm_timeout_seconds: float = Field(default=60, gt=0)
+    # Every supported endpoint is accessed through its OpenAI-compatible API.
+    # Ollama requires the `/v1` suffix and ignores the placeholder API key.
+    llm_base_url: str = "http://localhost:11434/v1"
+    llm_api_key: SecretStr = SecretStr("ollama")
+    llm_extra_headers: dict[str, str] = Field(default_factory=dict)
 
-    ollama_base_url: str = "http://localhost:11434"
-
-    openrouter_api_key: SecretStr | None = None
-    openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    openrouter_app_url: str | None = None
-    openrouter_app_title: str | None = None
-
-    openai_api_key: SecretStr | None = None
-    openai_base_url: str = "https://api.openai.com/v1"
+    # Langfuse uses its standard, unprefixed environment variables so the same
+    # project configuration can be shared by the API server and evaluation script.
+    langfuse_public_key: SecretStr | None = Field(
+        default=None,
+        validation_alias="LANGFUSE_PUBLIC_KEY",
+    )
+    langfuse_secret_key: SecretStr | None = Field(
+        default=None,
+        validation_alias="LANGFUSE_SECRET_KEY",
+    )
+    langfuse_base_url: str | None = Field(
+        default=None,
+        validation_alias="LANGFUSE_BASE_URL",
+    )
+    langfuse_environment: str = Field(
+        default="development",
+        validation_alias="LANGFUSE_TRACING_ENVIRONMENT",
+    )
+    langfuse_release: str | None = Field(
+        default=None,
+        validation_alias="LANGFUSE_RELEASE",
+    )
+    langfuse_tracing_enabled: bool = Field(
+        default=True,
+        validation_alias="LANGFUSE_TRACING_ENABLED",
+    )
 
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",

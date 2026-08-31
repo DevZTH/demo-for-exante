@@ -2,14 +2,11 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
 from backend.app.domain import MessageRecord, ScenarioRecord, ScenarioTurn, SemanticMatch
-
-if TYPE_CHECKING:
-    from backend.app.agent_service import AgentResponse
 
 
 class ScenarioResponse(BaseModel):
@@ -139,13 +136,13 @@ class ScenarioTurnResponse(BaseModel):
     def from_turn_and_agent(
         cls,
         turn: ScenarioTurn,
-        agent_response: AgentResponse,
+        agent_response: AgentResponseData,
     ) -> "ScenarioTurnResponse":
         return cls(
             scenario=ScenarioResponse.from_record(turn.scenario),
             user_message=MessageResponse.from_record(turn.user_message),
             assistant_message=MessageResponse.from_record(turn.assistant_message),
-            agent_response=AgentResponseData(**agent_response.to_dict()),
+            agent_response=agent_response,
             context=[SemanticMatchResponse.from_match(match) for match in turn.context],
             provider=turn.provider,
             model=turn.model,

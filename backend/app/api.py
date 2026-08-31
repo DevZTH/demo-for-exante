@@ -39,22 +39,14 @@ def read_settings(settings: Settings = Depends(get_settings)) -> SettingsRespons
     return SettingsResponse(
         app_name=settings.app_name,
         api_prefix=settings.api_prefix,
-        llm_provider=settings.llm_provider,
+        llm_provider="openai_compatible",
         llm_model=settings.llm_model,
-        llm_endpoint=_llm_endpoint(settings),
+        llm_endpoint=settings.llm_base_url,
         chat_storage_mode=settings.chat_storage_mode,
         history_window_messages=settings.history_window_messages,
         semantic_memory_limit=settings.semantic_memory_limit,
         embedding_dimensions=settings.embedding_dimensions,
     )
-
-
-def _llm_endpoint(settings: Settings) -> str:
-    if settings.llm_provider == "ollama":
-        return settings.ollama_base_url
-    if settings.llm_provider == "openrouter":
-        return settings.openrouter_base_url
-    return settings.openai_base_url
 
 
 @router.post("/scenarios/turns", response_model=ScenarioTurnResponse)

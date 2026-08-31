@@ -1,0 +1,174 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1050" viewBox="0 0 1600 1050" role="img" aria-labelledby="title desc">
+  <title id="title">Архитектура бэкенда EXANTE Scenario Trainer</title>
+  <desc id="desc">Схема FastAPI-бэкенда: API, AgentService, память SQLite с опциональным sqlite-vec, локальные эмбеддинги и выбранный LLM-провайдер.</desc>
+  <style>
+    :root { color-scheme: light; }
+    .bg { fill: #f7f9fc; }
+    .title { font: 700 32px Inter, Arial, sans-serif; fill: #16233a; }
+    .subtitle { font: 400 16px Inter, Arial, sans-serif; fill: #5c6b82; }
+    .group { fill: #ffffff; stroke: #d7dfeb; stroke-width: 1.5; }
+    .group-label { font: 700 14px Inter, Arial, sans-serif; fill: #6c7a90; letter-spacing: 1.2px; }
+    .node { stroke-width: 1.5; }
+    .node-title { font: 700 18px Inter, Arial, sans-serif; fill: #16233a; }
+    .node-text { font: 400 14px Inter, Arial, sans-serif; fill: #40506a; }
+    .node-code { font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #33415c; }
+    .small { font: 400 12px Inter, Arial, sans-serif; fill: #58677e; }
+    .edge { fill: none; stroke: #71809a; stroke-width: 2; marker-end: url(#arrow); }
+    .edge-dashed { fill: none; stroke: #71809a; stroke-width: 1.75; stroke-dasharray: 7 6; marker-end: url(#arrow); }
+    .edge-label { font: 600 12px Inter, Arial, sans-serif; fill: #4e5d74; }
+    .num { font: 700 12px Inter, Arial, sans-serif; fill: #ffffff; }
+  </style>
+  <defs>
+    <filter id="shadow" x="-15%" y="-15%" width="130%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#253858" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#71809a"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1600" height="1050"/>
+  <text class="title" x="64" y="62">EXANTE Scenario Trainer — архитектура бэкенда</text>
+  <text class="subtitle" x="64" y="91">Текущее устройство кода в <tspan font-family="ui-monospace, monospace">backend/</tspan> · API v1 · сценарный диалог Relationship Manager с клиентом-агентом</text>
+
+  <!-- External caller -->
+  <rect class="group" x="54" y="305" width="256" height="268" rx="18"/>
+  <text class="group-label" x="78" y="339">ВНЕШНИЙ КЛИЕНТ</text>
+  <rect x="78" y="365" width="208" height="152" rx="12" fill="#e9f2ff" stroke="#8bb8ff" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="102" y="402">Web-клиент</text>
+  <text class="node-text" x="102" y="429">или другой HTTP-клиент</text>
+  <text class="node-code" x="102" y="469">POST /scenarios/turns</text>
+  <text class="small" x="102" y="493">CORS: localhost:5173</text>
+
+  <!-- Backend boundary -->
+  <rect class="group" x="350" y="130" width="810" height="830" rx="20"/>
+  <text class="group-label" x="378" y="164">PYTHON / FASTAPI БЭКЕНД</text>
+
+  <!-- Settings -->
+  <rect x="390" y="190" width="310" height="124" rx="12" fill="#f1ebff" stroke="#bba4ff" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="414" y="226">Settings</text>
+  <text class="node-code" x="414" y="250">backend/settings.py</text>
+  <text class="node-text" x="414" y="277">.env / CHAT_*: провайдер, LLM,</text>
+  <text class="node-text" x="414" y="298">SQLite, окно истории, лимиты</text>
+
+  <!-- FastAPI -->
+  <rect x="390" y="367" width="310" height="300" rx="12" fill="#e8fbf5" stroke="#67c9a7" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="414" y="405">FastAPI application</text>
+  <text class="node-code" x="414" y="429">backend/main.py</text>
+  <line x1="414" y1="448" x2="675" y2="448" stroke="#b4dfd0"/>
+  <text class="node-title" x="414" y="481">API router</text>
+  <text class="node-code" x="414" y="505">app/api.py</text>
+  <text class="node-text" x="414" y="535">• POST /scenarios/turns</text>
+  <text class="node-text" x="414" y="558">• GET /scenarios, /messages</text>
+  <text class="node-text" x="414" y="581">• DELETE /scenarios/{id}</text>
+  <text class="node-text" x="414" y="614">lifespan: инициализирует</text>
+  <text class="node-text" x="414" y="637">Repository + AgentService</text>
+
+  <!-- Prompt -->
+  <rect x="770" y="190" width="334" height="124" rx="12" fill="#fff6df" stroke="#efbb54" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="794" y="226">Системный промпт клиента</text>
+  <text class="node-code" x="794" y="250">agent/customer.md</text>
+  <text class="node-text" x="794" y="278">Персона, правила симуляции</text>
+  <text class="node-text" x="794" y="299">и формат оценочного ответа</text>
+
+  <!-- Agent -->
+  <rect x="770" y="367" width="334" height="300" rx="12" fill="#eaf0ff" stroke="#89aaff" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="794" y="405">AgentService</text>
+  <text class="node-code" x="794" y="429">app/agent_service.py</text>
+  <line x1="794" y1="448" x2="1080" y2="448" stroke="#bdcfff"/>
+  <text class="node-text" x="794" y="481">1. Создаёт / находит сценарий</text>
+  <text class="node-text" x="794" y="507">2. Собирает историю и релевантную</text>
+  <text class="node-text" x="812" y="528">семантическую память</text>
+  <text class="node-text" x="794" y="555">3. Собирает LangChain prompt chain</text>
+  <text class="node-text" x="794" y="581">4. Валидирует структурный ответ LLM</text>
+  <text class="node-text" x="794" y="614">5. Сохраняет turn и отдаёт API</text>
+  <text class="small" x="794" y="642">reply · intetions · state · trust · probability · done</text>
+
+  <!-- Memory -->
+  <rect x="390" y="740" width="310" height="161" rx="12" fill="#eef9e9" stroke="#88c971" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="414" y="778">LangChain history</text>
+  <text class="node-code" x="414" y="802">app/memory.py</text>
+  <text class="node-text" x="414" y="830">SQLiteScenarioMessageHistory</text>
+  <text class="node-text" x="414" y="854">читает окно истории, сохраняет</text>
+  <text class="node-text" x="414" y="875">user + assistant сообщения</text>
+
+  <!-- Embeddings -->
+  <rect x="770" y="740" width="334" height="161" rx="12" fill="#fff0f1" stroke="#ed9399" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="794" y="778">LocalHashEmbeddings</text>
+  <text class="node-code" x="794" y="802">app/embeddings.py</text>
+  <text class="node-text" x="794" y="830">Локальные детерминированные</text>
+  <text class="node-text" x="794" y="852">эмбеддинги без внешнего API</text>
+  <text class="small" x="794" y="876">только для semantic memory</text>
+
+  <!-- LLM external -->
+  <rect class="group" x="1202" y="130" width="344" height="343" rx="18"/>
+  <text class="group-label" x="1228" y="164">LLM-ПРОВАЙДЕР</text>
+  <rect x="1228" y="190" width="292" height="220" rx="12" fill="#fff1e6" stroke="#f3a567" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="1252" y="228">Chat model</text>
+  <text class="node-code" x="1252" y="253">app/providers.py</text>
+  <text class="node-text" x="1252" y="286">Выбирается по CHAT_LLM_PROVIDER:</text>
+  <text class="node-text" x="1252" y="315">• Ollama</text>
+  <text class="node-text" x="1252" y="340">• OpenRouter</text>
+  <text class="node-text" x="1252" y="365">• OpenAI-compatible API</text>
+  <text class="small" x="1252" y="393">structured output → AgentResponseData</text>
+
+  <!-- Persistence external -->
+  <rect class="group" x="1202" y="545" width="344" height="415" rx="18"/>
+  <text class="group-label" x="1228" y="579">ЛОКАЛЬНОЕ ХРАНИЛИЩЕ</text>
+  <rect x="1228" y="605" width="292" height="292" rx="12" fill="#eef5ff" stroke="#7da9e8" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="1252" y="643">ChatRepository</text>
+  <text class="node-code" x="1252" y="667">app/storage.py</text>
+  <line x1="1252" y1="686" x2="1496" y2="686" stroke="#bcd4f3"/>
+  <text class="node-text" x="1252" y="719">SQLite</text>
+  <text class="small" x="1252" y="741">chats · messages · metadata_json</text>
+  <text class="node-text" x="1252" y="774">sqlite-vec (опционально)</text>
+  <text class="small" x="1252" y="796">message_vectors (если sqlite_vec)</text>
+  <text class="node-text" x="1252" y="831">WAL + внешние ключи</text>
+  <text class="small" x="1252" y="856">backend/data/chat.sqlite3</text>
+
+  <!-- Arrows and annotations -->
+  <path class="edge" d="M286 441 H390"/>
+  <circle cx="334" cy="441" r="12" fill="#477ee8"/><text class="num" x="330.5" y="445.5">1</text>
+  <text class="edge-label" x="300" y="420">HTTP / JSON</text>
+
+  <path class="edge-dashed" d="M545 314 V367"/>
+  <text class="edge-label" x="558" y="346">config</text>
+  <path class="edge-dashed" d="M700 252 H770"/>
+  <text class="edge-label" x="711" y="241">prompt config</text>
+
+  <path class="edge" d="M700 517 H770"/>
+  <circle cx="735" cy="517" r="12" fill="#477ee8"/><text class="num" x="731.5" y="521.5">2</text>
+  <text class="edge-label" x="711" y="496">turn</text>
+
+  <path class="edge" d="M937 367 V314"/>
+  <circle cx="937" cy="340" r="12" fill="#477ee8"/><text class="num" x="933.5" y="344.5">3</text>
+  <text class="edge-label" x="951" y="345">system prompt</text>
+
+  <path class="edge" d="M770 617 C710 617, 700 676, 607 740"/>
+  <circle cx="700" cy="663" r="12" fill="#477ee8"/><text class="num" x="696.5" y="667.5">4</text>
+  <text class="edge-label" x="604" y="688">history window</text>
+
+  <path class="edge" d="M937 667 V740"/>
+  <circle cx="937" cy="704" r="12" fill="#477ee8"/><text class="num" x="933.5" y="708.5">5</text>
+  <text class="edge-label" x="951" y="706">embed query</text>
+
+  <path class="edge" d="M1104 820 H1228"/>
+  <path class="edge" d="M700 820 H740 C756 820, 756 805, 770 805"/>
+  <text class="edge-label" x="1121" y="803">vector search</text>
+  <text class="edge-label" x="704" y="844">save / load</text>
+
+  <path class="edge" d="M1104 517 H1228"/>
+  <circle cx="1166" cy="517" r="12" fill="#477ee8"/><text class="num" x="1162.5" y="521.5">6</text>
+  <text class="edge-label" x="1123" y="496">prompt → JSON</text>
+
+  <path class="edge-dashed" d="M770 610 H748 C724 610, 724 642, 700 642"/>
+  <text class="edge-label" x="704" y="635">response</text>
+
+  <path class="edge-dashed" d="M390 592 H334 C316 592, 316 526, 286 526"/>
+  <text class="edge-label" x="299" y="556">ScenarioTurnResponse</text>
+
+  <!-- Footer -->
+  <line x1="64" y1="995" x2="1536" y2="995" stroke="#d7dfeb"/>
+  <text class="small" x="64" y="1021">Основной путь: 1 запрос → 2 оркестрация → 3–5 контекст → 6 структурированный ответ LLM → сохранение и JSON-ответ.</text>
+  <text class="small" x="1536" y="1021" text-anchor="end">Режим sqlite отключает векторный поиск и таблицу message_vectors.</text>
+</svg>
