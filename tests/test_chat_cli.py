@@ -7,6 +7,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from backend import cli
 from backend.app.schemas import AgentResponseData, SupervisorAnalysisData
+from backend.app.supervisor_contract import RETRY_SUPERVISOR_ANALYSIS_CONTRACT
 
 
 class StubChain:
@@ -76,6 +77,7 @@ def test_analyze_history_sends_full_transcript_to_supervisor() -> None:
 
     assert result.overall_score == 82
     assert chain.calls[0]["conversation"] == "1. [rm]\nЗдравствуйте\n\n2. [client]\nДобрый день"
+    assert "КАЖДОЙ строки" in chain.calls[0]["analysis_contract"]
 
 
 def test_analyze_history_rejects_incomplete_message_review() -> None:
@@ -98,6 +100,9 @@ def test_analyze_history_rejects_incomplete_message_review() -> None:
         assert "каждую реплику" in str(error)
     else:
         raise AssertionError("Incomplete supervisor analysis must be rejected")
+
+    assert len(chain.calls) == 2
+    assert chain.calls[1]["analysis_contract"] == RETRY_SUPERVISOR_ANALYSIS_CONTRACT
 
 
 def test_analyze_command_prints_supervisor_report(monkeypatch, capsys) -> None:

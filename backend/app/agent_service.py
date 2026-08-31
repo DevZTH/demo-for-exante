@@ -14,6 +14,11 @@ from backend.app.memory import SQLiteScenarioMessageHistory
 from backend.app.providers import build_chat_model
 from backend.app.schemas import AgentResponseData, SupervisorAnalysisData
 from backend.app.storage import ChatRepository, ScenarioNotFoundError
+from backend.app.supervisor_contract import (
+    INITIAL_SUPERVISOR_ANALYSIS_CONTRACT,
+    RETRY_SUPERVISOR_ANALYSIS_CONTRACT,
+    validate_supervisor_report_language,
+)
 from backend.settings import Settings
 
 
@@ -45,21 +50,34 @@ class AgentService:
         if not messages:
             raise ValueError("Невозможно проанализировать сценарий без реплик.")
 
-        result = await self.supervisor_chain.ainvoke(
-            {
-                "supervisor_prompt": self._get_supervisor_prompt(),
-                "customer_profile": self._get_agent_system_prompt(),
-                "conversation": self._format_conversation_for_supervisor(messages),
-            },
-            config={"run_name": "analyze-scenario"},
+        request = {
+            "supervisor_prompt": self._get_supervisor_prompt(),
+            "customer_profile": self._get_agent_system_prompt(),
+            "conversation": self._format_conversation_for_supervisor(messages),
+        }
+        contracts = (
+            INITIAL_SUPERVISOR_ANALYSIS_CONTRACT,
+            RETRY_SUPERVISOR_ANALYSIS_CONTRACT,
         )
-        analysis = (
-            result
-            if isinstance(result, SupervisorAnalysisData)
-            else SupervisorAnalysisData.model_validate(result)
-        )
-        self._validate_supervisor_analysis(analysis, messages)
-        return analysis
+        for contract in contracts:
+            result = await self.supervisor_chain.ainvoke(
+                {**request, "analysis_contract": contract},
+                config={"run_name": "analyze-scenario"},
+            )
+            try:
+                analysis = (
+                    result
+                    if isinstance(result, SupervisorAnalysisData)
+                    else SupervisorAnalysisData.model_validate(result)
+                )
+                self._validate_supervisor_analysis(analysis, messages)
+                validate_supervisor_report_language(analysis)
+                return analysis
+            except ValueError:
+                if contract == contracts[-1]:
+                    raise
+
+        raise RuntimeError("Не удалось сформировать отчёт супервайзера")
 
     async def process_message(
         self,
@@ -245,6 +263,7 @@ class AgentService:
             [
                 ("system", "{supervisor_prompt}"),
                 ("system", "<customer_profile>\n{customer_profile}\n</customer_profile>"),
+                ("system", "<analysis_contract>\n{analysis_contract}\n</analysis_contract>"),
                 ("human", "<conversation>\n{conversation}\n</conversation>"),
             ]
         )

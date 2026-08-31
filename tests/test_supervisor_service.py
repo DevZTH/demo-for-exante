@@ -9,6 +9,7 @@ from backend.app.agent_service import AgentService
 from backend.app.api import analyze_scenario
 from backend.app.schemas import AgentResponseData, SupervisorAnalysisData
 from backend.app.storage import ChatRepository, ScenarioNotFoundError
+from backend.app.supervisor_contract import RETRY_SUPERVISOR_ANALYSIS_CONTRACT
 from backend.settings import Settings
 
 
@@ -85,7 +86,7 @@ def test_analyze_scenario_uses_visible_persisted_messages(tmp_path) -> None:
     result = asyncio.run(service.analyze_scenario(scenario_id))
 
     assert result.overall_score == 82
-    assert chain.calls[0] == {
+    assert {key: value for key, value in chain.calls[0].items() if key != "analysis_contract"} == {
         "supervisor_prompt": "supervisor rules",
         "customer_profile": "customer profile",
         "conversation": (
@@ -93,6 +94,7 @@ def test_analyze_scenario_uses_visible_persisted_messages(tmp_path) -> None:
             "2. [client]\nМне нравятся низкие комиссии."
         ),
     }
+    assert "КАЖДОЙ строки" in chain.calls[0]["analysis_contract"]
 
 
 def test_analyze_scenario_requires_complete_message_review(tmp_path) -> None:
@@ -101,6 +103,61 @@ def test_analyze_scenario_requires_complete_message_review(tmp_path) -> None:
 
     with pytest.raises(ValueError, match="каждую реплику"):
         asyncio.run(service.analyze_scenario(scenario_id))
+
+    assert len(service.supervisor_chain.calls) == 2
+    assert service.supervisor_chain.calls[1]["analysis_contract"] == RETRY_SUPERVISOR_ANALYSIS_CONTRACT
+
+
+def test_analyze_scenario_retries_incomplete_supervisor_report(tmp_path) -> None:
+    complete = analysis()
+    incomplete = complete.model_copy(update={"message_analyses": [complete.message_analyses[0]]})
+
+    class RetryingChain:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, object]] = []
+            self.results = [incomplete, complete]
+
+        async def ainvoke(self, values: dict[str, object], **_: object) -> SupervisorAnalysisData:
+            self.calls.append(values)
+            return self.results.pop(0)
+
+    chain = RetryingChain()
+    service, scenario_id = make_service(tmp_path, chain)  # type: ignore[arg-type]
+
+    result = asyncio.run(service.analyze_scenario(scenario_id))
+
+    assert result == complete
+    assert len(chain.calls) == 2
+    assert chain.calls[1]["analysis_contract"] == RETRY_SUPERVISOR_ANALYSIS_CONTRACT
+
+
+def test_analyze_scenario_retries_english_supervisor_report(tmp_path) -> None:
+    complete = analysis()
+    english = complete.model_copy(deep=True)
+    english.overall_assessment = "The RM opened the conversation effectively."
+    english.message_analyses[0].assessment = "The question is relevant."
+    english.message_analyses[0].recommendation = "Ask a follow-up question."
+    english.message_analyses[1].assessment = "The client is cautious."
+    english.message_analyses[1].recommendation = "Explore the client's concern."
+    english.priority_recommendations = ["Continue discovery before presenting the product."]
+
+    class RetryingChain:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, object]] = []
+            self.results = [english, complete]
+
+        async def ainvoke(self, values: dict[str, object], **_: object) -> SupervisorAnalysisData:
+            self.calls.append(values)
+            return self.results.pop(0)
+
+    chain = RetryingChain()
+    service, scenario_id = make_service(tmp_path, chain)  # type: ignore[arg-type]
+
+    result = asyncio.run(service.analyze_scenario(scenario_id))
+
+    assert result == complete
+    assert len(chain.calls) == 2
+    assert chain.calls[1]["analysis_contract"] == RETRY_SUPERVISOR_ANALYSIS_CONTRACT
 
 
 def test_analyze_scenario_rejects_unknown_scenario(tmp_path) -> None:

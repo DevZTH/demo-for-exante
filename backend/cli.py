@@ -22,6 +22,11 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from backend.app.providers import build_chat_model
 from backend.app.schemas import AgentResponseData, SupervisorAnalysisData
+from backend.app.supervisor_contract import (
+    INITIAL_SUPERVISOR_ANALYSIS_CONTRACT,
+    RETRY_SUPERVISOR_ANALYSIS_CONTRACT,
+    validate_supervisor_report_language,
+)
 from backend.settings import Settings, get_settings
 
 
@@ -48,6 +53,7 @@ def build_supervisor_chain(settings: Settings):
         [
             ("system", "{supervisor_prompt}"),
             ("system", "<customer_profile>\n{customer_profile}\n</customer_profile>"),
+            ("system", "<analysis_contract>\n{analysis_contract}\n</analysis_contract>"),
             ("human", "<conversation>\n{conversation}\n</conversation>"),
         ]
     )
@@ -101,20 +107,31 @@ async def analyze_history(
 ) -> SupervisorAnalysisData:
     """Ask the supervisor to analyse all messages collected in this CLI session."""
     invoke = getattr(supervisor_chain, "ainvoke")
-    result = await invoke(
-        {
-            "supervisor_prompt": supervisor_prompt,
-            "customer_profile": customer_profile,
-            "conversation": format_history_for_analysis(history),
-        }
+    request = {
+        "supervisor_prompt": supervisor_prompt,
+        "customer_profile": customer_profile,
+        "conversation": format_history_for_analysis(history),
+    }
+    contracts = (
+        INITIAL_SUPERVISOR_ANALYSIS_CONTRACT,
+        RETRY_SUPERVISOR_ANALYSIS_CONTRACT,
     )
-    analysis = (
-        result
-        if isinstance(result, SupervisorAnalysisData)
-        else SupervisorAnalysisData.model_validate(result)
-    )
-    _validate_message_analyses(analysis, history)
-    return analysis
+    for contract in contracts:
+        result = await invoke({**request, "analysis_contract": contract})
+        try:
+            analysis = (
+                result
+                if isinstance(result, SupervisorAnalysisData)
+                else SupervisorAnalysisData.model_validate(result)
+            )
+            _validate_message_analyses(analysis, history)
+            validate_supervisor_report_language(analysis)
+            return analysis
+        except ValueError:
+            if contract == contracts[-1]:
+                raise
+
+    raise RuntimeError("Не удалось сформировать отчёт супервайзера")
 
 
 def _validate_message_analyses(
