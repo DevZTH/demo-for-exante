@@ -7,21 +7,13 @@ import {
   SendHorizontal,
   Sparkles,
   SquarePen,
+  Trash2,
   User,
 } from 'lucide-react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000/api/v1';
-
-const DEFAULT_SCENARIO_MESSAGE = 'Здравствуйте, Андрей. Я ваш Relationship Manager в EXANTE.';
-
-const welcomeMessage = {
-  id: 'welcome',
-  role: 'assistant',
-  text: 'Начните EXANTE-сценарий: вы — Relationship Manager, а я отвечу от лица потенциального клиента.',
-  time: nowTime(),
-};
 
 function formatTime(value) {
   const date = value ? new Date(value) : new Date();
@@ -86,7 +78,7 @@ async function apiFetch(path, options) {
 }
 
 function App() {
-  const [messages, setMessages] = useState([welcomeMessage]);
+  const [messages, setMessages] = useState([]);
   const [scenarios, setScenarios] = useState([]);
   const [activeScenarioId, setActiveScenarioId] = useState(null);
   const [draft, setDraft] = useState('');
@@ -94,12 +86,15 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isTyping, setIsTyping] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [deletingScenarioId, setDeletingScenarioId] = useState(null);
   const [supervisorReport, setSupervisorReport] = useState(null);
   const [error, setError] = useState('');
   const messagesRef = useRef(null);
 
-  const canSend = draft.trim().length > 0 && !isTyping;
-  const canAnalyze = Boolean(activeScenarioId) && !isTyping && !isAnalyzing;
+  const isDeleting = deletingScenarioId !== null;
+  const isScenarioActionInProgress = isTyping || isAnalyzing || isDeleting;
+  const canSend = draft.trim().length > 0 && !isTyping && !isDeleting;
+  const canAnalyze = Boolean(activeScenarioId) && !isScenarioActionInProgress;
   const groupedMessages = useMemo(() => messages, [messages]);
   const activeScenario = scenarios.find((scenario) => scenario.id === activeScenarioId);
 
@@ -222,34 +217,21 @@ function App() {
     }
   }
 
-  async function startNewScenario() {
+  function startNewScenario() {
+    if (isScenarioActionInProgress) {
+      return;
+    }
+
     setError('');
     setDraft('');
     setSupervisorReport(null);
-    setIsTyping(true);
-
-    try {
-      const turn = await apiFetch('/scenarios/turns', {
-        method: 'POST',
-        body: JSON.stringify({ message: DEFAULT_SCENARIO_MESSAGE }),
-      });
-
-      setActiveScenarioId(turn.scenario.id);
-      setMessages([mapMessage(turn.user_message), mapMessage(turn.assistant_message)]);
-      await refreshScenarios(turn.scenario.id);
-      if (turn.agent_response.done) {
-        await runSupervisor(turn.scenario.id);
-      }
-      setIsSidebarOpen(false);
-    } catch (scenarioError) {
-      setError(`Не удалось запустить сценарий: ${scenarioError.message}`);
-    } finally {
-      setIsTyping(false);
-    }
+    setActiveScenarioId(null);
+    setMessages([]);
+    setIsSidebarOpen(false);
   }
 
   async function runSupervisor(scenarioId = activeScenarioId) {
-    if (!scenarioId || isAnalyzing) {
+    if (!scenarioId || isAnalyzing || isDeleting) {
       return;
     }
 
@@ -267,13 +249,50 @@ function App() {
     }
   }
 
+  async function deleteScenario(event, scenario) {
+    event.stopPropagation();
+    if (isTyping || isAnalyzing || isDeleting) {
+      return;
+    }
+
+    const title = scenario.title || 'Новый сценарий';
+    if (!window.confirm(`Удалить сценарий «${title}»? Это действие нельзя отменить.`)) {
+      return;
+    }
+
+    setDeletingScenarioId(scenario.id);
+    setError('');
+
+    try {
+      await apiFetch(`/scenarios/${scenario.id}`, { method: 'DELETE' });
+      const remainingScenarios = await apiFetch('/scenarios');
+      setScenarios(remainingScenarios);
+
+      if (scenario.id === activeScenarioId) {
+        setSupervisorReport(null);
+        setDraft('');
+        if (remainingScenarios.length > 0) {
+          await selectScenario(remainingScenarios[0].id);
+        } else {
+          setActiveScenarioId(null);
+          setMessages([]);
+          setIsSidebarOpen(false);
+        }
+      }
+    } catch (deleteError) {
+      setError(`Не удалось удалить сценарий: ${deleteError.message}`);
+    } finally {
+      setDeletingScenarioId(null);
+    }
+  }
+
   return (
     <main className="app-shell">
       <aside className={`sidebar ${isSidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-header">
-          <button className="brand-button" aria-label="Новый сценарий" onClick={startNewScenario}>
+          <button className="brand-button" aria-label="Новый сценарий" onClick={startNewScenario} disabled={isScenarioActionInProgress}>
             <Sparkles size={18} />
-            <span>EXANTE Trainer</span>
+            <span>EXANTE Demo chat</span>
           </button>
           <button className="icon-button mobile-only" aria-label="Закрыть меню" onClick={() => setIsSidebarOpen(false)}>
             <PanelLeftClose size={18} />
@@ -281,23 +300,40 @@ function App() {
         </div>
 
         <div className="sidebar-actions">
-          <button className="new-scenario-button" onClick={startNewScenario}>
+          <button className="new-scenario-button" onClick={startNewScenario} disabled={isScenarioActionInProgress}>
             <Sparkles size={18} />
             <span>Новый сценарий</span>
           </button>
         </div>
 
         <nav className="chat-list" aria-label="История сценариев">
-          {scenarios.map((scenario) => (
-            <button
-              className={`chat-item ${scenario.id === activeScenarioId ? 'active' : ''}`}
-              key={scenario.id}
-              onClick={() => selectScenario(scenario.id)}
-            >
-              <span>{scenario.title || 'Новый сценарий EXANTE'}</span>
-              <small>{formatScenarioMeta(scenario.updated_at)}</small>
-            </button>
-          ))}
+          {scenarios.map((scenario) => {
+            const isActive = scenario.id === activeScenarioId;
+            const title = scenario.title || 'Новый сценарий';
+
+            return (
+              <div className={`chat-list-item ${isActive ? 'active' : ''}`} key={scenario.id}>
+                <button
+                  className="chat-item"
+                  onClick={() => selectScenario(scenario.id)}
+                  disabled={isDeleting}
+                >
+                  <span>{title}</span>
+                  <small>{formatScenarioMeta(scenario.updated_at)}</small>
+                </button>
+                <button
+                  className="delete-chat-button"
+                  type="button"
+                  aria-label={`Удалить сценарий «${title}»`}
+                  title="Удалить сценарий"
+                  onClick={(event) => deleteScenario(event, scenario)}
+                  disabled={isScenarioActionInProgress}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            );
+          })}
         </nav>
       </aside>
 
@@ -306,11 +342,6 @@ function App() {
           <button className="icon-button desktop-hidden" aria-label="Открыть меню" onClick={() => setIsSidebarOpen(true)}>
             <Menu size={19} />
           </button>
-
-          <div className="model-select scenario-mode" aria-label="Активный сценарий">
-            <span className="model-dot" />
-            <span>EXANTE · клиентский сценарий</span>
-          </div>
 
           <div className="topbar-actions">
             <button
@@ -322,7 +353,7 @@ function App() {
               <ClipboardCheck size={17} />
               <span>{isAnalyzing ? 'Супервайзер анализирует…' : 'Отчёт супервайзера'}</span>
             </button>
-            <button className="icon-button" aria-label="Новый сценарий" onClick={startNewScenario}>
+            <button className="icon-button" aria-label="Новый сценарий" onClick={startNewScenario} disabled={isScenarioActionInProgress}>
               <SquarePen size={18} />
             </button>
           </div>
@@ -330,7 +361,7 @@ function App() {
 
         <div className="messages" aria-live="polite" ref={messagesRef}>
           <div className="day-divider">
-            <span>{activeScenario?.title || 'Новый сценарий EXANTE'}</span>
+            <span>{activeScenario?.title || 'Новый сценарий'}</span>
           </div>
 
           {isLoading && <TypingIndicator />}
