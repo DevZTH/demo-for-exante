@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage
@@ -11,7 +12,7 @@ from backend.app.domain import MessageRecord, ScenarioTurn, SemanticMatch
 from backend.app.embeddings import LocalHashEmbeddings
 from backend.app.memory import SQLiteScenarioMessageHistory
 from backend.app.providers import build_chat_model
-from backend.app.schemas import AgentResponseData
+from backend.app.schemas import AgentResponseData, SupervisorAnalysisData
 from backend.app.storage import ChatRepository, ScenarioNotFoundError
 from backend.settings import Settings
 
@@ -31,6 +32,34 @@ class AgentService:
         self.embeddings = LocalHashEmbeddings(settings.embedding_dimensions)
         self.llm = build_chat_model(settings)
         self.chain = self._build_chain()
+        self.supervisor_chain = self._build_supervisor_chain()
+
+    async def analyze_scenario(self, scenario_id: str) -> SupervisorAnalysisData:
+        """Produce coaching for every visible message in one saved scenario."""
+        self.repository.require_scenario(scenario_id)
+        messages = [
+            message
+            for message in self.repository.list_messages(scenario_id)
+            if message.role in {"user", "assistant"}
+        ]
+        if not messages:
+            raise ValueError("Невозможно проанализировать сценарий без реплик.")
+
+        result = await self.supervisor_chain.ainvoke(
+            {
+                "supervisor_prompt": self._get_supervisor_prompt(),
+                "customer_profile": self._get_agent_system_prompt(),
+                "conversation": self._format_conversation_for_supervisor(messages),
+            },
+            config={"run_name": "analyze-scenario"},
+        )
+        analysis = (
+            result
+            if isinstance(result, SupervisorAnalysisData)
+            else SupervisorAnalysisData.model_validate(result)
+        )
+        self._validate_supervisor_analysis(analysis, messages)
+        return analysis
 
     async def process_message(
         self,
@@ -210,11 +239,27 @@ class AgentService:
         )
         return prompt | self.llm.with_structured_output(AgentResponseData)
 
+    def _build_supervisor_chain(self):
+        """Build the independent structured coaching chain."""
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", "{supervisor_prompt}"),
+                ("system", "<customer_profile>\n{customer_profile}\n</customer_profile>"),
+                ("human", "<conversation>\n{conversation}\n</conversation>"),
+            ]
+        )
+        return prompt | self.llm.with_structured_output(SupervisorAnalysisData)
+
     def _get_agent_system_prompt(self) -> str:
         """Get the system prompt for the customer agent from customer.md."""
         with open("backend/agent/customer.md", "r", encoding="utf-8") as f:
             retval = f.read()
         return retval
+
+    def _get_supervisor_prompt(self) -> str:
+        """Get the coaching rules for the supervisor role."""
+        with open("backend/agent/supervisor.md", "r", encoding="utf-8") as f:
+            return f.read()
 
     def _semantic_context(
         self,
@@ -241,6 +286,36 @@ class AgentService:
             f"- {match.message.role}: {_visible_context_content(match.message)}"
             for match in matches
         )
+
+    @staticmethod
+    def _format_conversation_for_supervisor(messages: Sequence[MessageRecord]) -> str:
+        """Render persisted messages in the same explicit format as the CLI."""
+        transcript: list[str] = []
+        for number, message in enumerate(messages, start=1):
+            speaker = "rm" if message.role == "user" else "client"
+            transcript.append(
+                f"{number}. [{speaker}]\n{_visible_context_content(message)}"
+            )
+        return "\n\n".join(transcript)
+
+    @staticmethod
+    def _validate_supervisor_analysis(
+        analysis: SupervisorAnalysisData,
+        messages: Sequence[MessageRecord],
+    ) -> None:
+        """Require coaching feedback for every message, in chronological order."""
+        expected = [
+            (number, "rm" if message.role == "user" else "client")
+            for number, message in enumerate(messages, start=1)
+        ]
+        actual = [
+            (item.message_number, item.speaker)
+            for item in analysis.message_analyses
+        ]
+        if actual != expected:
+            raise ValueError(
+                "супервайзер должен разобрать каждую реплику в исходном порядке"
+            )
 
     @staticmethod
     def _saved_turn(records: list[MessageRecord]) -> tuple[MessageRecord, MessageRecord]:

@@ -1,5 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Menu, PanelLeftClose, SendHorizontal, Sparkles, SquarePen, User } from 'lucide-react';
+import {
+  Bot,
+  ClipboardCheck,
+  Menu,
+  PanelLeftClose,
+  SendHorizontal,
+  Sparkles,
+  SquarePen,
+  User,
+} from 'lucide-react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 
@@ -90,10 +99,13 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isTyping, setIsTyping] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [supervisorReport, setSupervisorReport] = useState(null);
   const [error, setError] = useState('');
   const messagesRef = useRef(null);
 
   const canSend = draft.trim().length > 0 && !isTyping;
+  const canAnalyze = Boolean(activeScenarioId) && !isTyping && !isAnalyzing;
   const groupedMessages = useMemo(() => messages, [messages]);
   const activeScenario = scenarios.find((scenario) => scenario.id === activeScenarioId);
 
@@ -134,7 +146,7 @@ function App() {
       top: messagesRef.current.scrollHeight,
       behavior: 'smooth',
     });
-  }, [messages, isTyping]);
+  }, [messages, isTyping, supervisorReport]);
 
   async function refreshScenarios(nextActiveScenarioId = activeScenarioId) {
     const scenarioList = await apiFetch('/scenarios');
@@ -150,6 +162,7 @@ function App() {
         setIsLoading(true);
       }
       setError('');
+      setSupervisorReport(null);
       setActiveScenarioId(scenarioId);
       const loadedMessages = await apiFetch(`/scenarios/${scenarioId}/messages`);
       setMessages(loadedMessages.map(mapMessage));
@@ -176,6 +189,7 @@ function App() {
     setMessages((current) => [...current, userMessage]);
     setDraft('');
     setIsTyping(true);
+    setSupervisorReport(null);
     setError('');
 
     try {
@@ -193,6 +207,9 @@ function App() {
         return [...current.filter((message) => message.id !== optimisticId), ...savedTurn];
       });
       await refreshScenarios(turn.scenario.id);
+      if (turn.agent_response.done) {
+        await runSupervisor(turn.scenario.id);
+      }
     } catch (sendError) {
       setMessages((current) => [
         ...current.filter((message) => message.id !== optimisticId),
@@ -214,6 +231,7 @@ function App() {
   async function startNewScenario() {
     setError('');
     setDraft('');
+    setSupervisorReport(null);
     setIsTyping(true);
 
     try {
@@ -225,11 +243,33 @@ function App() {
       setActiveScenarioId(turn.scenario.id);
       setMessages([mapMessage(turn.user_message), mapMessage(turn.assistant_message)]);
       await refreshScenarios(turn.scenario.id);
+      if (turn.agent_response.done) {
+        await runSupervisor(turn.scenario.id);
+      }
       setIsSidebarOpen(false);
     } catch (scenarioError) {
       setError(`Не удалось запустить сценарий: ${scenarioError.message}`);
     } finally {
       setIsTyping(false);
+    }
+  }
+
+  async function runSupervisor(scenarioId = activeScenarioId) {
+    if (!scenarioId || isAnalyzing) {
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setError('');
+    try {
+      const report = await apiFetch(`/scenarios/${scenarioId}/analysis`, {
+        method: 'POST',
+      });
+      setSupervisorReport(report);
+    } catch (analysisError) {
+      setError(`Не удалось получить отчёт супервайзера: ${analysisError.message}`);
+    } finally {
+      setIsAnalyzing(false);
     }
   }
 
@@ -278,9 +318,20 @@ function App() {
             <span>EXANTE · клиентский сценарий</span>
           </div>
 
-          <button className="icon-button" aria-label="Новый сценарий" onClick={startNewScenario}>
-            <SquarePen size={18} />
-          </button>
+          <div className="topbar-actions">
+            <button
+              className="analysis-button"
+              type="button"
+              onClick={() => runSupervisor()}
+              disabled={!canAnalyze}
+            >
+              <ClipboardCheck size={17} />
+              <span>{isAnalyzing ? 'Супервайзер анализирует…' : 'Отчёт супервайзера'}</span>
+            </button>
+            <button className="icon-button" aria-label="Новый сценарий" onClick={startNewScenario}>
+              <SquarePen size={18} />
+            </button>
+          </div>
         </header>
 
         <div className="messages" aria-live="polite" ref={messagesRef}>
@@ -316,6 +367,8 @@ function App() {
           )}
 
           {isTyping && <TypingIndicator />}
+
+          {supervisorReport && <SupervisorReport report={supervisorReport} />}
         </div>
 
         <form className="composer-wrap" onSubmit={handleSubmit}>
@@ -345,6 +398,46 @@ function App() {
         </form>
       </section>
     </main>
+  );
+}
+
+function SupervisorReport({ report }) {
+  return (
+    <article className="supervisor-report" aria-label="Отчёт супервайзера">
+      <div className="supervisor-report-header">
+        <div>
+          <span>Отчёт супервайзера</span>
+          <h2>Оценка RM: {report.overall_score}/100</h2>
+        </div>
+        <ClipboardCheck size={22} aria-hidden="true" />
+      </div>
+      <p className="supervisor-summary">{report.overall_assessment}</p>
+
+      <section className="report-section">
+        <h3>Разбор реплик</h3>
+        <div className="report-messages">
+          {report.message_analyses.map((item) => (
+            <article className="report-message" key={`${item.message_number}-${item.speaker}`}>
+              <div className="report-message-heading">
+                <strong>{item.message_number}. {item.speaker === 'rm' ? 'RM' : 'Клиент'}</strong>
+                <span>{item.speaker === 'rm' ? 'Оценка' : 'Сигнал'}: {item.score}/10</span>
+              </div>
+              <p>{item.assessment}</p>
+              <p className="report-recommendation">Следующий шаг: {item.recommendation}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="report-section">
+        <h3>Приоритетные рекомендации</h3>
+        <ol className="report-recommendations">
+          {report.priority_recommendations.map((recommendation, index) => (
+            <li key={`${index}-${recommendation}`}>{recommendation}</li>
+          ))}
+        </ol>
+      </section>
+    </article>
   );
 }
 

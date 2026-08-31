@@ -9,6 +9,7 @@ from backend.app.schemas import (
     ScenarioTurnRequest,
     ScenarioTurnResponse,
     SettingsResponse,
+    SupervisorAnalysisData,
 )
 from backend.app.storage import ChatRepository, ScenarioNotFoundError
 from backend.settings import Settings
@@ -68,6 +69,29 @@ async def create_scenario_turn(
         ) from exc
 
     return ScenarioTurnResponse.from_turn_and_agent(turn, agent_response)
+
+
+@router.post(
+    "/scenarios/{scenario_id}/analysis",
+    response_model=SupervisorAnalysisData,
+)
+async def analyze_scenario(
+    scenario_id: str,
+    service: AgentService = Depends(get_agent_service),
+) -> SupervisorAnalysisData:
+    """Run the sales supervisor over the full persisted scenario history."""
+    try:
+        return await service.analyze_scenario(scenario_id)
+    except ScenarioNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Scenario not found",
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
 
 
 @router.get("/scenarios", response_model=list[ScenarioResponse])

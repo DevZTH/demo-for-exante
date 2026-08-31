@@ -149,7 +149,7 @@ async def run_chat(*, show_signal: bool) -> None:
 
     while True:
         try:
-            message = input("RM > ").strip()
+            message = input("\nRM > ").strip()
         except EOFError:
             print()
             break
@@ -201,7 +201,7 @@ async def run_chat(*, show_signal: bool) -> None:
 
         # Keep only the spoken customer reply in the conversation context.
         history.extend([HumanMessage(content=message), AIMessage(content=response.reply)])
-        print(f"Клиент > {response.reply}")
+        print(f"\nКлиент > {response.reply}")
 
         if show_signal:
             print(

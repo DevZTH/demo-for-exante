@@ -123,6 +123,8 @@ curl -X POST http://127.0.0.1:8000/api/v1/scenarios/turns \
 - `GET /api/v1/scenarios` — список сценариев.
 - `GET /api/v1/scenarios/{scenario_id}` — один сценарий.
 - `GET /api/v1/scenarios/{scenario_id}/messages` — история видимых реплик.
+- `POST /api/v1/scenarios/{scenario_id}/analysis` — полный отчёт супервайзера
+  по диалогу: итоговая оценка, разбор каждой реплики и рекомендации.
 - `DELETE /api/v1/scenarios/{scenario_id}` — удалить сценарий.
 
 Ответ на turn содержит `scenario`, сохранённые user/assistant сообщения и `agent_response` с полями `reply`, `intetions`, `state`, `trust`, `purchase_probability`, `done`. В `assistant_message.content` возвращается только видимая реплика клиента; внутренний JSON модели не выдаётся как текст сообщения.
