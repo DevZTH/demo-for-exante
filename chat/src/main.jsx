@@ -14,12 +14,6 @@ import './styles.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000/api/v1';
 
-const suggestions = [
-  'Здравствуйте, Андрей. Чем вы довольны у текущего брокера?',
-  'Какие рынки и инструменты для вас сейчас наиболее важны?',
-  'Давайте разберём комиссии и условия открытия счёта.',
-];
-
 const DEFAULT_SCENARIO_MESSAGE = 'Здравствуйте, Андрей. Я ваш Relationship Manager в EXANTE.';
 
 const welcomeMessage = {
@@ -372,14 +366,6 @@ function App() {
         </div>
 
         <form className="composer-wrap" onSubmit={handleSubmit}>
-          <div className="suggestions" aria-label="Подсказки для диалога">
-            {suggestions.map((suggestion) => (
-              <button type="button" key={suggestion} onClick={() => setDraft(suggestion)}>
-                {suggestion}
-              </button>
-            ))}
-          </div>
-
           <div className="composer">
             <textarea
               value={draft}
