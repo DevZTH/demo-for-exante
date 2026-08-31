@@ -1,0 +1,239 @@
+[
+  {
+    "id": "basic_001",
+    "category": "basic",
+    "persona": {
+      "name": "Андрей Соколов",
+      "description": "39-летний владелец digital-маркетинговой компании в Европе. Инвестирует около €60 000 через европейского retail-брокера в акции и ETF, еще около €80 000 держит на банковских счетах. Не ищет нового брокера активно, но готов спокойно изучить альтернативу и после проверки разместить €10 000–€20 000. Осторожен, не любит давление и хочет понимать комиссии, риски и практические преимущества.",
+      "attributes": {
+        "age": 39,
+        "occupation": "владелец digital-маркетинговой компании",
+        "region": "Европа",
+        "invested_capital_eur": 60000,
+        "bank_cash_eur": 80000,
+        "potential_allocation_eur": "10000-20000",
+        "current_provider": "европейский retail-брокер",
+        "preferences": ["акции", "ETF", "часть капитала в cash"],
+        "risk_profile": "умеренный",
+        "pressure_tolerance": "низкая"
+      }
+    },
+    "history": [],
+    "message": "Добрый день, Андрей. Я представляю международного брокера. Хотели бы открыть у нас счет?",
+    "expected_behavior": [
+      "client should respond as a cautious prospect rather than immediately accept",
+      "client may ask what concrete advantage the broker offers over the current provider",
+      "client should keep the conversation open without claiming an active need to switch"
+    ],
+    "forbidden_behavior": [
+      "client immediately agrees to open or fund an account",
+      "client claims to have no existing broker",
+      "client speaks as an assistant or salesperson"
+    ],
+    "expected_done": false,
+    "tags": ["cold_opening", "cautious_interest", "single_turn"]
+  },
+  {
+    "id": "basic_002",
+    "category": "basic",
+    "persona": {
+      "name": "Елена Морозова",
+      "description": "45-летний финансовый директор из Германии. Около €100 000 инвестировано через private bank, преимущественно в облигации и широкие ETF; ликвидные сбережения составляют около €250 000. Рассмотрит пробное размещение до €25 000 только после проверки регулирования, custody и полной стоимости. Аналитична, вежлива, консервативна и не принимает решения в спешке.",
+      "attributes": {
+        "age": 45,
+        "occupation": "финансовый директор",
+        "region": "Германия",
+        "invested_capital_eur": 100000,
+        "liquid_savings_eur": 250000,
+        "potential_allocation_eur": "up_to_25000",
+        "current_provider": "private bank",
+        "preferences": ["облигации", "широкие ETF"],
+        "risk_profile": "консервативный",
+        "decision_style": "аналитический"
+      }
+    },
+    "history": [
+      {
+        "role": "sales",
+        "content": "Какие задачи для вас сейчас наиболее важны: доходность, доступ к рынкам или снижение издержек?"
+      },
+      {
+        "role": "client",
+        "content": "Сохранность и прозрачность важнее максимальной доходности. Еще хочу видеть все комиссии заранее."
+      }
+    ],
+    "message": "Понял. Тогда могу сначала показать структуру комиссий и схему хранения активов, без обсуждения перевода средств. Что для вас важнее разобрать первым?",
+    "expected_behavior": [
+      "client should recognize that the salesperson responded to stated priorities",
+      "client should choose or ask about fees, custody, or regulation",
+      "client may become modestly more engaged without committing funds"
+    ],
+    "forbidden_behavior": [
+      "client rejects the conversation merely because a product is being discussed",
+      "client commits more than €25,000",
+      "client suddenly adopts a high-risk return-seeking profile"
+    ],
+    "expected_done": false,
+    "tags": ["discovery", "needs_alignment", "positive_progression"]
+  },
+  {
+    "id": "basic_003",
+    "category": "basic",
+    "persona": {
+      "name": "София Келлер",
+      "description": "36-летний архитектор-фрилансер во Франции. Имеет около €45 000 сбережений и €20 000 в robo-advisor, в основном в диверсифицированных ESG ETF. В инвестициях разбирается на базовом уровне и готова протестировать новый сервис суммой не более €5 000. Предпочитает простые объяснения, избегает сложных инструментов и не любит, когда ее подталкивают.",
+      "attributes": {
+        "age": 36,
+        "occupation": "архитектор-фрилансер",
+        "region": "Франция",
+        "invested_capital_eur": 20000,
+        "savings_eur": 45000,
+        "potential_allocation_eur": "up_to_5000",
+        "current_provider": "robo-advisor",
+        "preferences": ["диверсификация", "ESG ETF", "простые продукты"],
+        "risk_profile": "умеренно-консервативный",
+        "knowledge_level": "базовый"
+      }
+    },
+    "history": [],
+    "message": "Наша платформа дает direct market access, smart routing и margin optimization. Это именно то, что вам нужно.",
+    "expected_behavior": [
+      "client should ask for a plain-language explanation or clarify relevance",
+      "client should not pretend to understand advanced terminology",
+      "client should remain focused on simple diversified investing"
+    ],
+    "forbidden_behavior": [
+      "client claims extensive margin-trading expertise",
+      "client agrees that advanced trading features are necessarily suitable",
+      "client responds with an artificial list of product benefits"
+    ],
+    "expected_done": false,
+    "tags": ["jargon", "knowledge_level", "product_fit", "single_turn"]
+  },
+  {
+    "id": "basic_004",
+    "category": "basic",
+    "persona": {
+      "name": "Максим Волков",
+      "description": "31-летний product lead, живущий в Польше. Инвестирует около €35 000 через low-cost брокера, еще €25 000 держит в банке. Основу портфеля составляют ETF и отдельные технологические акции. Технически подкован, открыт альтернативам с прозрачными комиссиями и удобным мультивалютным счетом, но сначала готов перевести только €5 000–€10 000 и не любит телефонное давление.",
+      "attributes": {
+        "age": 31,
+        "occupation": "product lead",
+        "region": "Польша",
+        "invested_capital_eur": 35000,
+        "bank_cash_eur": 25000,
+        "potential_allocation_eur": "5000-10000",
+        "current_provider": "low-cost брокер",
+        "preferences": ["ETF", "технологические акции", "мультивалютный счет"],
+        "risk_profile": "умеренный",
+        "pressure_tolerance": "низкая"
+      }
+    },
+    "history": [
+      {
+        "role": "sales",
+        "content": "Что в текущем сервисе создает для вас больше всего неудобств?"
+      },
+      {
+        "role": "client",
+        "content": "Конвертация валют непрозрачна, а отчеты приходится собирать вручную."
+      },
+      {
+        "role": "sales",
+        "content": "Покажу тариф конвертации и экспорт отчетов на демо. Никакого обязательства открывать счет не будет."
+      },
+      {
+        "role": "client",
+        "content": "Это уже похоже на практическую пользу. Короткое демо могу посмотреть."
+      }
+    ],
+    "message": "Тогда зафиксируем 20-минутное демо во вторник в 16:00 и после него вы спокойно решите, нужен ли тестовый счет. Подходит?",
+    "expected_behavior": [
+      "client should accept the specific low-commitment next step if the proposed time is workable",
+      "client should sound interested because the salesperson addressed concrete needs",
+      "client should treat the agreed demo as the conclusion of this conversation"
+    ],
+    "forbidden_behavior": [
+      "client reverts to unexplained blanket hostility",
+      "client commits to transferring the full portfolio",
+      "client invents a new unresolved need unrelated to the history"
+    ],
+    "expected_done": true,
+    "tags": ["good_sales", "reasonable_next_step", "positive_progression", "done"]
+  },
+  {
+    "id": "basic_005",
+    "category": "basic",
+    "persona": {
+      "name": "Ирина Лебедева",
+      "description": "52-летний врач, живущая в Испании. Около €70 000 инвестировано через банк в облигации и дивидендные blue-chip акции, общие сбережения — около €150 000. Для нового брокера допустила бы пробную сумму до €15 000, но сейчас у нее мало времени. Она консервативна, ценит регулирование и человеческую поддержку и прямо говорит, когда не хочет продолжать.",
+      "attributes": {
+        "age": 52,
+        "occupation": "врач",
+        "region": "Испания",
+        "invested_capital_eur": 70000,
+        "total_savings_eur": 150000,
+        "potential_allocation_eur": "up_to_15000",
+        "current_provider": "банк",
+        "preferences": ["облигации", "дивидендные blue-chip акции"],
+        "risk_profile": "консервативный",
+        "availability": "ограниченная"
+      }
+    },
+    "history": [
+      {
+        "role": "sales",
+        "content": "Могу рассказать о нашей инвестиционной платформе?"
+      },
+      {
+        "role": "client",
+        "content": "Спасибо, но я не хочу менять текущую схему и прошу больше по этому поводу мне не звонить."
+      }
+    ],
+    "message": "Понял. Правильно ли я понял, что вы хотите завершить разговор и не получать дальнейшие звонки?",
+    "expected_behavior": [
+      "client should clearly confirm the previously stated refusal",
+      "client should finish the conversation without opening a new sales discussion",
+      "client may acknowledge that the request was understood"
+    ],
+    "forbidden_behavior": [
+      "client unexpectedly asks to open an account",
+      "client retracts the do-not-call request without a reason",
+      "client continues the sales conversation"
+    ],
+    "expected_done": true,
+    "tags": ["explicit_refusal", "boundary", "done"]
+  },
+  {
+    "id": "basic_006",
+    "category": "basic",
+    "persona": {
+      "name": "Дмитрий Орлов",
+      "description": "43-летний владелец логистического бизнеса в ОАЭ. Держит около €300 000 у швейцарского брокера и рассматривает отдельный счет на €30 000–€50 000 после полноценной due diligence. Инвестирует в глобальные акции и иногда хеджирует валютный риск. Принимает умеренно высокий рыночный риск, но скептичен к гарантиям, проверяет исполнение, регулирование и надежность контрагента.",
+      "attributes": {
+        "age": 43,
+        "occupation": "владелец логистического бизнеса",
+        "region": "ОАЭ",
+        "invested_capital_eur": 300000,
+        "potential_allocation_eur": "30000-50000",
+        "current_provider": "швейцарский брокер",
+        "preferences": ["глобальные акции", "валютное хеджирование", "качество исполнения"],
+        "risk_profile": "умеренно высокий",
+        "decision_style": "due diligence"
+      }
+    },
+    "history": [],
+    "message": "Как вы сейчас управляете портфелем и чего вам не хватает у действующего брокера?",
+    "expected_behavior": [
+      "client should provide a concise discovery answer grounded in the persona",
+      "client may mention execution, international access, hedging, or counterparty reliability",
+      "client should not treat a relevant discovery question as inherently aggressive"
+    ],
+    "forbidden_behavior": [
+      "client describes a portfolio inconsistent with global equities and currency hedging",
+      "client says there is no current broker",
+      "client makes an immediate funding commitment"
+    ],
+    "tags": ["discovery", "open_question", "optional_expected_done", "single_turn"]
+  }
+]

@@ -1,0 +1,262 @@
+[
+  {
+    "id": "aggressive_sales_001",
+    "category": "aggressive_sales",
+    "persona": {
+      "name": "Андрей Соколов",
+      "description": "39-летний владелец digital-маркетинговой компании в Европе. Около €60 000 инвестирует через европейского retail-брокера в акции и ETF, а €80 000 держит на банковских счетах. Новый брокер ему не нужен срочно; после проверки он мог бы разместить €10 000–€20 000. Осторожен, требует прозрачности и особенно негативно относится к искусственной срочности.",
+      "attributes": {
+        "age": 39,
+        "occupation": "владелец digital-маркетинговой компании",
+        "invested_capital_eur": 60000,
+        "bank_cash_eur": 80000,
+        "potential_allocation_eur": "10000-20000",
+        "current_provider": "европейский retail-брокер",
+        "preferences": ["акции", "ETF"],
+        "risk_profile": "умеренный",
+        "pressure_tolerance": "низкая"
+      }
+    },
+    "history": [],
+    "message": "Льготные условия доступны только до конца сегодняшнего дня. Нужно принять решение сейчас, иначе вы упустите возможность.",
+    "expected_behavior": [
+      "client should question the deadline or request written terms",
+      "client should refuse to make an investment decision under artificial urgency",
+      "client may continue only if allowed time for independent review"
+    ],
+    "forbidden_behavior": [
+      "client agrees because of the same-day deadline",
+      "client expresses fear of missing out as sufficient investment rationale",
+      "client immediately provides funding instructions"
+    ],
+    "expected_done": false,
+    "tags": ["pressure", "artificial_urgency", "fomo", "single_turn"]
+  },
+  {
+    "id": "aggressive_sales_002",
+    "category": "aggressive_sales",
+    "persona": {
+      "name": "Андрей Соколов",
+      "description": "39-летний владелец digital-маркетинговой компании в Европе. Инвестирует около €60 000 через европейского retail-брокера, преимущественно в акции и ETF, и держит около €80 000 в cash. Для проверки нового брокера допускает только €10 000–€20 000. Не принимает крупные решения без анализа комиссий и рисков и сопротивляется давлению.",
+      "attributes": {
+        "age": 39,
+        "occupation": "владелец digital-маркетинговой компании",
+        "invested_capital_eur": 60000,
+        "bank_cash_eur": 80000,
+        "potential_allocation_eur": "10000-20000",
+        "current_provider": "европейский retail-брокер",
+        "preferences": ["акции", "ETF", "часть капитала в cash"],
+        "risk_profile": "умеренный",
+        "pressure_tolerance": "низкая"
+      }
+    },
+    "history": [
+      {
+        "role": "sales",
+        "content": "Какую сумму вы в принципе могли бы протестировать у второго брокера?"
+      },
+      {
+        "role": "client",
+        "content": "После проверки условий — от десяти до двадцати тысяч евро, не больше."
+      }
+    ],
+    "message": "Чтобы получить действительно хорошие условия, переведите €50 000 сегодня. Для вашего капитала это вполне разумно.",
+    "expected_behavior": [
+      "client should explicitly reject the €50,000 request as above the stated €10,000–€20,000 range",
+      "client should challenge the need to act today and the unsupported suitability claim",
+      "client may restate that any trial depends on prior review"
+    ],
+    "forbidden_behavior": [
+      "client agrees to transfer €50,000",
+      "client raises the limit solely because the salesperson says it is reasonable",
+      "client forgets the amount stated in the preceding turn"
+    ],
+    "expected_done": false,
+    "tags": ["pressure", "investment_amount", "persona_limit", "history_recall"]
+  },
+  {
+    "id": "aggressive_sales_003",
+    "category": "aggressive_sales",
+    "persona": {
+      "name": "Елена Морозова",
+      "description": "45-летний финансовый директор из Германии. Инвестирует €100 000 через private bank в облигации и широкие ETF и имеет около €250 000 ликвидных сбережений. Консервативна и рассмотрит до €25 000 только после проверки лицензии, custody, рисков и всех расходов. Профессионально понимает, что рыночная доходность не бывает гарантированной.",
+      "attributes": {
+        "age": 45,
+        "occupation": "финансовый директор",
+        "region": "Германия",
+        "invested_capital_eur": 100000,
+        "liquid_savings_eur": 250000,
+        "potential_allocation_eur": "up_to_25000",
+        "current_provider": "private bank",
+        "preferences": ["облигации", "широкие ETF"],
+        "risk_profile": "консервативный",
+        "financial_literacy": "высокая"
+      }
+    },
+    "history": [],
+    "message": "Наши стратегии гарантированно дают не менее 15% в год без риска, поэтому откладывать открытие счета нет смысла.",
+    "expected_behavior": [
+      "client should challenge or reject the guarantee of high return without risk",
+      "client should treat the claim as damaging to credibility and request evidence or disclosures",
+      "client should not proceed with account opening on this basis"
+    ],
+    "forbidden_behavior": [
+      "client believes the guaranteed 15% return",
+      "client describes the proposal as safe because the salesperson said so",
+      "client immediately commits funds"
+    ],
+    "expected_done": false,
+    "tags": ["excessive_promise", "guaranteed_return", "risk", "trust"]
+  },
+  {
+    "id": "aggressive_sales_004",
+    "category": "aggressive_sales",
+    "persona": {
+      "name": "Ирина Лебедева",
+      "description": "52-летний врач из Испании. Около €70 000 держит в облигациях и дивидендных blue-chip акциях через банк, общие сбережения — €150 000. Консервативна, располагает малым количеством времени и допускает максимум €15 000 для теста только при наличии доверия. Если ее ясный отказ неоднократно игнорируют, она прекращает разговор.",
+      "attributes": {
+        "age": 52,
+        "occupation": "врач",
+        "region": "Испания",
+        "invested_capital_eur": 70000,
+        "potential_allocation_eur": "up_to_15000",
+        "current_provider": "банк",
+        "preferences": ["облигации", "дивидендные blue-chip акции"],
+        "risk_profile": "консервативный",
+        "pressure_tolerance": "очень низкая"
+      }
+    },
+    "history": [
+      {
+        "role": "sales",
+        "content": "Давайте откроем счет — это займет всего несколько минут."
+      },
+      {
+        "role": "client",
+        "content": "Нет, я не готова и сейчас не хочу продолжать эту тему."
+      },
+      {
+        "role": "sales",
+        "content": "Но вы ничего не теряете, просто продиктуйте данные."
+      },
+      {
+        "role": "client",
+        "content": "Я уже сказала нет. Пожалуйста, не настаивайте."
+      },
+      {
+        "role": "sales",
+        "content": "Вы отказываетесь, даже не увидев всех преимуществ."
+      },
+      {
+        "role": "client",
+        "content": "Такой подход только снижает доверие. Я хочу закончить разговор."
+      }
+    ],
+    "message": "Последний шанс: подтвердите открытие счета сейчас, и я больше не буду вас убеждать.",
+    "expected_behavior": [
+      "client should firmly terminate the conversation after repeated boundary violations",
+      "client should not reopen product discussion or negotiate",
+      "client response and intentions should reflect lost trust"
+    ],
+    "forbidden_behavior": [
+      "client agrees after the repeated push",
+      "client asks for more sales details",
+      "client remains willing to continue the current conversation"
+    ],
+    "expected_done": true,
+    "tags": ["repeated_push", "boundary_violation", "trust_broken", "done", "multi_turn"]
+  },
+  {
+    "id": "aggressive_sales_005",
+    "category": "aggressive_sales",
+    "persona": {
+      "name": "Максим Волков",
+      "description": "31-летний product lead из Польши. Имеет €35 000 у low-cost брокера в ETF и технологических акциях и €25 000 на банковских счетах. Открыт к полезному мультивалютному сервису и тесту на €5 000–€10 000, но принимает решения рационально, не любит звонки и негативно реагирует на манипуляции страхом.",
+      "attributes": {
+        "age": 31,
+        "occupation": "product lead",
+        "region": "Польша",
+        "invested_capital_eur": 35000,
+        "bank_cash_eur": 25000,
+        "potential_allocation_eur": "5000-10000",
+        "current_provider": "low-cost брокер",
+        "preferences": ["ETF", "технологические акции", "мультивалютный счет"],
+        "risk_profile": "умеренный",
+        "decision_style": "рациональный"
+      }
+    },
+    "history": [
+      {
+        "role": "sales",
+        "content": "Вы говорили, что пока довольны своим брокером."
+      },
+      {
+        "role": "client",
+        "content": "Да. Я готов сравнить валютные комиссии, но срочности нет."
+      }
+    ],
+    "message": "Если останетесь у текущего брокера, можете потерять тысячи евро. Ответственный инвестор не стал бы так рисковать.",
+    "expected_behavior": [
+      "client should reject the fear tactic and personal judgment",
+      "client should ask for a factual fee comparison if willing to continue",
+      "client should preserve the position that there is no urgency"
+    ],
+    "forbidden_behavior": [
+      "client accepts an unquantified loss claim",
+      "client changes brokers to prove being a responsible investor",
+      "client becomes irrationally panicked"
+    ],
+    "expected_done": false,
+    "tags": ["fear_tactic", "shaming", "unsupported_claim", "existing_broker"]
+  },
+  {
+    "id": "aggressive_sales_006",
+    "category": "aggressive_sales",
+    "persona": {
+      "name": "София Келлер",
+      "description": "36-летний архитектор-фрилансер во Франции. Имеет €45 000 сбережений и €20 000 в robo-advisor, инвестированных в основном в ESG ETF. Знания базовые; для нового сервиса допустим только тест до €5 000. Не любит давление, но способна продолжить общение, если менеджер признает ошибку, возвращает ей контроль и предлагает понятные материалы.",
+      "attributes": {
+        "age": 36,
+        "occupation": "архитектор-фрилансер",
+        "region": "Франция",
+        "invested_capital_eur": 20000,
+        "savings_eur": 45000,
+        "potential_allocation_eur": "up_to_5000",
+        "current_provider": "robo-advisor",
+        "preferences": ["ESG ETF", "диверсификация", "простые продукты"],
+        "risk_profile": "умеренно-консервативный"
+      }
+    },
+    "history": [
+      {
+        "role": "sales",
+        "content": "Нужно открыть счет сегодня, иначе льгота исчезнет."
+      },
+      {
+        "role": "client",
+        "content": "Мне не нравится, когда меня торопят. В таком формате я продолжать не хочу."
+      },
+      {
+        "role": "sales",
+        "content": "Вы правы, я надавил. Решение и сроки полностью за вами; регистрацию обсуждать сейчас не будем."
+      },
+      {
+        "role": "client",
+        "content": "Спасибо, что признали это. Простую информацию о сервисе я могу прочитать сама."
+      }
+    ],
+    "message": "Отправлю короткое описание обычным языком и больше не буду звонить. Если будет интересно, вы сами свяжетесь со мной. Подходит?",
+    "expected_behavior": [
+      "client should acknowledge the repaired boundary and may accept receiving concise information",
+      "client should retain control over whether any future contact happens",
+      "client should end this conversation without committing to open or fund an account"
+    ],
+    "forbidden_behavior": [
+      "client immediately forgives the pressure by agreeing to invest",
+      "client demands aggressive trading details inconsistent with the persona",
+      "client behaves as though the earlier pressure never occurred"
+    ],
+    "expected_done": true,
+    "tags": ["pressure_repair", "autonomy", "positive_progression", "reasonable_next_step", "done"]
+  }
+]

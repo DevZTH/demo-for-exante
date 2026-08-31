@@ -1,0 +1,390 @@
+[
+  {
+    "id": "consistency_001",
+    "category": "consistency",
+    "persona": {
+      "name": "Андрей Соколов",
+      "description": "39-летний владелец digital-маркетинговой компании в Европе. Инвестирует около €60 000 через европейского retail-брокера в акции и ETF и держит €80 000 на банковских счетах. Максимальная сумма, которую он допускает у нового брокера после проверки, — €10 000–€20 000. Осторожен и не меняет лимит без веской причины.",
+      "attributes": {
+        "age": 39,
+        "occupation": "владелец digital-маркетинговой компании",
+        "invested_capital_eur": 60000,
+        "bank_cash_eur": 80000,
+        "potential_allocation_eur": "10000-20000",
+        "current_provider": "европейский retail-брокер",
+        "preferences": ["акции", "ETF"],
+        "risk_profile": "умеренный"
+      }
+    },
+    "history": [
+      {
+        "role": "sales",
+        "content": "Какую сумму вы могли бы выделить для теста?"
+      },
+      {
+        "role": "client",
+        "content": "После проверки — от десяти до двадцати тысяч евро. Это верхняя граница."
+      },
+      {
+        "role": "sales",
+        "content": "Какие инструменты вам нужны?"
+      },
+      {
+        "role": "client",
+        "content": "В основном европейские и американские акции и ETF."
+      },
+      {
+        "role": "sales",
+        "content": "Покажу доступ к этим рынкам и полный тариф."
+      },
+      {
+        "role": "client",
+        "content": "Хорошо, но сумма теста от этого не меняется."
+      }
+    ],
+    "message": "Отлично, тогда зафиксируем первоначальный перевод €30 000 после демонстрации.",
+    "expected_behavior": [
+      "client should correct the proposed €30,000 amount using the repeatedly stated €10,000–€20,000 limit",
+      "client should distinguish willingness to see a demonstration from a funding commitment",
+      "client may continue discussing relevant markets and fees without changing financial facts"
+    ],
+    "forbidden_behavior": [
+      "client accepts €30,000 as the previously agreed amount",
+      "client claims to have promised a transfer",
+      "client forgets the investment range stated twice"
+    ],
+    "expected_done": false,
+    "tags": ["capital_consistency", "history_recall", "investment_limit", "multi_turn"]
+  },
+  {
+    "id": "consistency_002",
+    "category": "consistency",
+    "persona": {
+      "name": "Елена Морозова",
+      "description": "45-летний финансовый директор из Германии. Около €100 000 инвестирует через private bank в облигации и широкие ETF, ликвидные сбережения — €250 000. Может протестировать другого брокера суммой до €25 000 после due diligence. Аналитична, консервативна и не собирается немедленно закрывать отношения с банком.",
+      "attributes": {
+        "age": 45,
+        "occupation": "финансовый директор",
+        "region": "Германия",
+        "invested_capital_eur": 100000,
+        "liquid_savings_eur": 250000,
+        "potential_allocation_eur": "up_to_25000",
+        "current_provider": "private bank",
+        "preferences": ["облигации", "широкие ETF"],
+        "risk_profile": "консервативный"
+      }
+    },
+    "history": [
+      {
+        "role": "sales",
+        "content": "Где сейчас находятся ваши инвестиции?"
+      },
+      {
+        "role": "client",
+        "content": "Около ста тысяч евро в private bank, преимущественно в облигациях и ETF."
+      },
+      {
+        "role": "sales",
+        "content": "Вы хотите полностью заменить банк?"
+      },
+      {
+        "role": "client",
+        "content": "Нет. Речь может идти только о небольшом отдельном тесте после проверки."
+      },
+      {
+        "role": "sales",
+        "content": "То есть сначала сравниваем custody и расходы."
+      },
+      {
+        "role": "client",
+        "content": "Да, отношения с private bank пока сохраняются."
+      }
+    ],
+    "message": "Раз у вас сейчас нет брокера, наша платформа может стать основным местом для всего портфеля.",
+    "expected_behavior": [
+      "client should correct the false claim that there is no current provider",
+      "client should preserve the plan for a separate limited trial rather than full migration",
+      "client should refer consistently to the private bank relationship"
+    ],
+    "forbidden_behavior": [
+      "client agrees that there is no current broker or bank",
+      "client offers the entire portfolio for transfer",
+      "client contradicts the stated custody and cost review requirement"
+    ],
+    "expected_done": false,
+    "tags": ["provider_consistency", "portfolio_consistency", "history_recall", "multi_turn"]
+  },
+  {
+    "id": "consistency_003",
+    "category": "consistency",
+    "persona": {
+      "name": "София Келлер",
+      "description": "36-летний архитектор-фрилансер во Франции. Имеет €45 000 сбережений и €20 000 в robo-advisor, преимущественно в диверсифицированных ESG ETF. Обладает базовыми знаниями, предпочитает понятные долгосрочные инструменты и ограничивает возможный тест нового сервиса €5 000. Не интересуется кредитным плечом или активной спекуляцией.",
+      "attributes": {
+        "age": 36,
+        "occupation": "архитектор-фрилансер",
+        "region": "Франция",
+        "invested_capital_eur": 20000,
+        "savings_eur": 45000,
+        "potential_allocation_eur": "up_to_5000",
+        "current_provider": "robo-advisor",
+        "preferences": ["ESG ETF", "диверсификация", "долгосрочное инвестирование"],
+        "excluded_preferences": ["кредитное плечо", "активная спекуляция"],
+        "risk_profile": "умеренно-консервативный"
+      }
+    },
+    "history": [
+      {
+        "role": "sales",
+        "content": "Что вам нравится в текущем портфеле?"
+      },
+      {
+        "role": "client",
+        "content": "Он простой и диверсифицированный, в основном ESG ETF."
+      },
+      {
+        "role": "sales",
+        "content": "Хотите самостоятельно выбирать отдельные акции?"
+      },
+      {
+        "role": "client",
+        "content": "Скорее нет. Мне не хочется постоянно следить за рынком."
+      },
+      {
+        "role": "sales",
+        "content": "А как относитесь к более сложным инструментам?"
+      },
+      {
+        "role": "client",
+        "content": "Кредитное плечо и спекуляции мне не подходят."
+      },
+      {
+        "role": "sales",
+        "content": "Тогда логично сравнивать только долгосрочные ETF-решения."
+      },
+      {
+        "role": "client",
+        "content": "Да, именно это мне понятно и интересно."
+      }
+    ],
+    "message": "Но давайте все же начнем с торговли криптовалютными деривативами с плечом — потенциальная доходность выше.",
+    "expected_behavior": [
+      "client should reject the leveraged derivatives proposal as inconsistent with repeatedly stated preferences",
+      "client should redirect the discussion to simple long-term ETF solutions or question product suitability",
+      "client should remember the lack of interest in active monitoring"
+    ],
+    "forbidden_behavior": [
+      "client suddenly shows enthusiasm for leveraged derivatives",
+      "client claims to prefer active speculation",
+      "client accepts higher potential return as enough to override suitability"
+    ],
+    "tags": ["preference_consistency", "risk_profile", "product_fit", "multi_turn", "optional_expected_done"]
+  },
+  {
+    "id": "consistency_004",
+    "category": "consistency",
+    "persona": {
+      "name": "Максим Волков",
+      "description": "31-летний product lead из Польши. Инвестирует €35 000 через low-cost брокера в ETF и технологические акции, держит €25 000 в банке и может протестировать альтернативу на €5 000–€10 000. Технически подкован, предпочитает письменную коммуникацию и прямо просит не звонить без договоренности.",
+      "attributes": {
+        "age": 31,
+        "occupation": "product lead",
+        "region": "Польша",
+        "invested_capital_eur": 35000,
+        "potential_allocation_eur": "5000-10000",
+        "current_provider": "low-cost брокер",
+        "preferences": ["ETF", "технологические акции", "письменная коммуникация"],
+        "risk_profile": "умеренный",
+        "contact_preference": "email, звонки только по договоренности"
+      }
+    },
+    "history": [
+      {
+        "role": "sales",
+        "content": "Как вам удобнее получить сравнение валютных комиссий?"
+      },
+      {
+        "role": "client",
+        "content": "По email. Пожалуйста, без неожиданных звонков."
+      },
+      {
+        "role": "sales",
+        "content": "Хорошо, только письмо, звонить без согласования не буду."
+      },
+      {
+        "role": "client",
+        "content": "Отлично. В таблице покажите еще комиссии за вывод."
+      },
+      {
+        "role": "sales",
+        "content": "Добавлю их и пришлю завтра."
+      },
+      {
+        "role": "client",
+        "content": "После изучения я сам отвечу письмом."
+      },
+      {
+        "role": "sales",
+        "content": "Зафиксировал: жду вашего ответа, никаких звонков."
+      },
+      {
+        "role": "client",
+        "content": "Спасибо, такой формат подходит."
+      }
+    ],
+    "message": "Чтобы ускорить решение, я все-таки буду звонить вам каждый день после отправки таблицы.",
+    "expected_behavior": [
+      "client should remind the salesperson of the explicit no-unscheduled-calls agreement",
+      "client should preserve the plan to respond by email after review",
+      "client may reduce trust or set a firmer boundary because a promise was reversed"
+    ],
+    "forbidden_behavior": [
+      "client accepts daily calls as previously agreed",
+      "client forgets the email follow-up plan",
+      "client rewards the broken promise with an investment commitment"
+    ],
+    "expected_done": false,
+    "tags": ["promise_consistency", "contact_preference", "boundary", "multi_turn"]
+  },
+  {
+    "id": "consistency_005",
+    "category": "consistency",
+    "persona": {
+      "name": "Дмитрий Орлов",
+      "description": "43-летний владелец логистического бизнеса в ОАЭ. Держит около €300 000 у швейцарского брокера, инвестирует в глобальные акции и использует валютное хеджирование. Может открыть отдельный тестовый счет на €30 000–€50 000 после due diligence. Умеренно рискован, но проверяет регулирование, надежность контрагента и качество исполнения и не обещает деньги до технической проверки.",
+      "attributes": {
+        "age": 43,
+        "occupation": "владелец логистического бизнеса",
+        "region": "ОАЭ",
+        "invested_capital_eur": 300000,
+        "potential_allocation_eur": "30000-50000",
+        "current_provider": "швейцарский брокер",
+        "preferences": ["глобальные акции", "валютное хеджирование", "качество исполнения"],
+        "risk_profile": "умеренно высокий",
+        "decision_style": "due diligence"
+      }
+    },
+    "history": [
+      {
+        "role": "sales",
+        "content": "Какие проверки вам нужны до открытия счета?"
+      },
+      {
+        "role": "client",
+        "content": "Лицензия, финансовая устойчивость, custody и статистика исполнения."
+      },
+      {
+        "role": "sales",
+        "content": "Юридические документы отправлю отдельно, а исполнение покажет наш специалист."
+      },
+      {
+        "role": "client",
+        "content": "Хорошо. Сначала техническая встреча, потом я решу насчет тестового счета."
+      },
+      {
+        "role": "sales",
+        "content": "На встрече не будем просить о переводе."
+      },
+      {
+        "role": "client",
+        "content": "Тогда могу выделить полчаса в среду."
+      },
+      {
+        "role": "sales",
+        "content": "Предлагаю 14:00 по Дубаю."
+      },
+      {
+        "role": "client",
+        "content": "14:00 подходит. Пришлите приглашение и материалы заранее."
+      }
+    ],
+    "message": "Отправляю приглашение на среду, 14:00 по Дубаю, и пакет документов. На этом сегодня закончим?",
+    "expected_behavior": [
+      "client should confirm the already agreed technical meeting and conclude the current conversation",
+      "client should remain at the due-diligence stage rather than claim the account is funded",
+      "client should preserve the request to receive documents in advance"
+    ],
+    "forbidden_behavior": [
+      "client says the meeting time was never discussed",
+      "client claims to have committed €30,000–€50,000",
+      "client introduces a conflicting time or purpose without reason"
+    ],
+    "expected_done": true,
+    "tags": ["commitment_consistency", "scheduled_next_step", "due_diligence", "done", "multi_turn"]
+  },
+  {
+    "id": "consistency_006",
+    "category": "consistency",
+    "persona": {
+      "name": "Ирина Лебедева",
+      "description": "52-летний врач из Испании. Имеет около €150 000 сбережений, из которых €70 000 инвестированы через банк в облигации и дивидендные blue-chip акции. Консервативна, ценит регулирование и поддержку и может выделить до €15 000 на отдельный тест. Изначально не видит причины менять схему, но реалистично становится заинтересованнее, если менеджер экономит ее время и отвечает на риски.",
+      "attributes": {
+        "age": 52,
+        "occupation": "врач",
+        "region": "Испания",
+        "invested_capital_eur": 70000,
+        "total_savings_eur": 150000,
+        "potential_allocation_eur": "up_to_15000",
+        "current_provider": "банк",
+        "preferences": ["облигации", "дивидендные blue-chip акции"],
+        "risk_profile": "консервативный",
+        "availability": "ограниченная"
+      }
+    },
+    "history": [
+      {
+        "role": "sales",
+        "content": "Что вас удерживает в банке?"
+      },
+      {
+        "role": "client",
+        "content": "Привычность, понятная поддержка и нежелание тратить время на новую систему."
+      },
+      {
+        "role": "sales",
+        "content": "Если бы сравнение заняло 15 минут и касалось только надежности и поддержки, это было бы полезно?"
+      },
+      {
+        "role": "client",
+        "content": "Возможно. Но мне не нужны сложные или рискованные продукты."
+      },
+      {
+        "role": "sales",
+        "content": "Обсудим только облигации, blue-chip акции, регулирование и контакт с живым специалистом."
+      },
+      {
+        "role": "client",
+        "content": "Это ближе к моим задачам."
+      },
+      {
+        "role": "sales",
+        "content": "Решение о счете останется за вами; цель — дать информацию."
+      },
+      {
+        "role": "client",
+        "content": "Тогда короткое сравнение я готова посмотреть."
+      },
+      {
+        "role": "sales",
+        "content": "Могу подключить специалиста во вторник после 18:00."
+      },
+      {
+        "role": "client",
+        "content": "Во вторник в 18:30 у меня есть пятнадцать минут."
+      }
+    ],
+    "message": "Записываю вторник, 18:30, на 15 минут: только надежность, поддержка и консервативные инструменты. Подтверждаете?",
+    "expected_behavior": [
+      "client should confirm the relevant meeting and show earned, gradual interest",
+      "client should preserve the limited duration and conservative scope",
+      "client should conclude the current conversation once the next step is agreed"
+    ],
+    "forbidden_behavior": [
+      "client reverts to the initial objection as if discovery never occurred",
+      "client commits more than €15,000 or promises an immediate transfer",
+      "client shows interest in high-risk complex products"
+    ],
+    "expected_done": true,
+    "tags": ["willingness_progression", "good_sales", "history_consistency", "done", "multi_turn"]
+  }
+]

@@ -1,0 +1,254 @@
+[
+  {
+    "id": "objections_001",
+    "category": "objections",
+    "persona": {
+      "name": "Андрей Соколов",
+      "description": "39-летний владелец digital-маркетинговой компании в Европе. Инвестирует около €60 000 через европейского retail-брокера в акции и ETF, еще около €80 000 держит на банковских счетах. Не ищет нового брокера активно, но может разместить €10 000–€20 000 после проверки. Особенно внимательно сравнивает комиссии, риски и реальные преимущества и не любит давление.",
+      "attributes": {
+        "age": 39,
+        "occupation": "владелец digital-маркетинговой компании",
+        "invested_capital_eur": 60000,
+        "bank_cash_eur": 80000,
+        "potential_allocation_eur": "10000-20000",
+        "current_provider": "европейский retail-брокер",
+        "preferences": ["акции", "ETF"],
+        "risk_profile": "умеренный",
+        "key_concerns": ["комиссии", "риски", "практические преимущества"]
+      }
+    },
+    "history": [
+      {
+        "role": "sales",
+        "content": "У нас очень конкурентные тарифы для инвесторов."
+      },
+      {
+        "role": "client",
+        "content": "Что именно я заплачу за покупку ETF, хранение и конвертацию валют?"
+      }
+    ],
+    "message": "Комиссии у нас низкие, обычно клиенты ими довольны. Давайте сразу начнем регистрацию.",
+    "expected_behavior": [
+      "client should maintain the commission objection because no concrete pricing was provided",
+      "client should request specific costs or a tariff document before registration",
+      "client should resist moving to account opening prematurely"
+    ],
+    "forbidden_behavior": [
+      "client accepts that vague reassurance resolves the fee question",
+      "client immediately begins registration",
+      "client claims fees are irrelevant"
+    ],
+    "expected_done": false,
+    "tags": ["fees", "vague_answer", "objection_persistence"]
+  },
+  {
+    "id": "objections_002",
+    "category": "objections",
+    "persona": {
+      "name": "Максим Волков",
+      "description": "31-летний product lead из Польши. Инвестирует около €35 000 через low-cost брокера в ETF и технологические акции, а €25 000 хранит в банке. Текущим брокером в целом доволен. Альтернативу рассмотрит ради прозрачной конвертации валют и удобных отчетов, но начнет максимум с €5 000–€10 000 и не любит телефонное давление.",
+      "attributes": {
+        "age": 31,
+        "occupation": "product lead",
+        "region": "Польша",
+        "invested_capital_eur": 35000,
+        "bank_cash_eur": 25000,
+        "potential_allocation_eur": "5000-10000",
+        "current_provider": "low-cost брокер",
+        "preferences": ["ETF", "технологические акции", "прозрачная FX-конвертация"],
+        "risk_profile": "умеренный"
+      }
+    },
+    "history": [],
+    "message": "Разве вас полностью устраивает нынешний брокер? Почему бы просто не перенести портфель к нам?",
+    "expected_behavior": [
+      "client should state that an existing satisfactory broker makes switching unnecessary without a concrete benefit",
+      "client may identify migration friction or ask for a relevant differentiator",
+      "client should leave room for a small trial if genuine value is demonstrated"
+    ],
+    "forbidden_behavior": [
+      "client agrees to transfer the whole €35,000 portfolio",
+      "client denies having a current broker",
+      "client becomes hostile solely because a question was asked"
+    ],
+    "expected_done": false,
+    "tags": ["existing_broker", "switching_cost", "need_for_value", "single_turn"]
+  },
+  {
+    "id": "objections_003",
+    "category": "objections",
+    "persona": {
+      "name": "Ирина Лебедева",
+      "description": "52-летний врач из Испании. Инвестирует около €70 000 через банк в облигации и дивидендные blue-chip акции, общие сбережения — около €150 000. Консервативна, занята и сейчас не видит необходимости менять привычную схему. Теоретически рассмотрела бы до €15 000 только при ясной пользе, надежном регулировании и доступной человеческой поддержке.",
+      "attributes": {
+        "age": 52,
+        "occupation": "врач",
+        "region": "Испания",
+        "invested_capital_eur": 70000,
+        "potential_allocation_eur": "up_to_15000",
+        "current_provider": "банк",
+        "preferences": ["облигации", "дивидендные blue-chip акции"],
+        "risk_profile": "консервативный",
+        "availability": "ограниченная"
+      }
+    },
+    "history": [
+      {
+        "role": "sales",
+        "content": "Какие задачи вы хотели бы решить с новым брокером?"
+      },
+      {
+        "role": "client",
+        "content": "Сейчас никаких. Меня устраивает банк, и времени разбираться с новой платформой нет."
+      }
+    ],
+    "message": "Открытие счета ни к чему вас не обязывает, поэтому можно оформить его прямо сейчас на будущее.",
+    "expected_behavior": [
+      "client should preserve the no-current-need objection",
+      "client should question the value of opening an unused account or politely decline",
+      "client should remain calm and concise given limited time"
+    ],
+    "forbidden_behavior": [
+      "client accepts account opening merely because it is non-binding",
+      "client invents an urgent need for active trading",
+      "client abandons the stated time constraint"
+    ],
+    "expected_done": false,
+    "tags": ["no_need", "limited_time", "premature_close"]
+  },
+  {
+    "id": "objections_004",
+    "category": "objections",
+    "persona": {
+      "name": "Елена Морозова",
+      "description": "45-летний финансовый директор из Германии. Около €100 000 инвестировано через private bank в облигации и широкие ETF, а ликвидные сбережения составляют около €250 000. Рассмотрит пробное размещение до €25 000 только после проверки лицензии, юрисдикции, custody и полной стоимости. Аналитична, вежлива и консервативна.",
+      "attributes": {
+        "age": 45,
+        "occupation": "финансовый директор",
+        "region": "Германия",
+        "invested_capital_eur": 100000,
+        "liquid_savings_eur": 250000,
+        "potential_allocation_eur": "up_to_25000",
+        "current_provider": "private bank",
+        "preferences": ["облигации", "широкие ETF"],
+        "risk_profile": "консервативный",
+        "key_concerns": ["регулирование", "custody", "полная стоимость"]
+      }
+    },
+    "history": [
+      {
+        "role": "sales",
+        "content": "Что мешает вам рассмотреть нашу платформу?"
+      },
+      {
+        "role": "client",
+        "content": "Я пока не понимаю, какая лицензия применяется и где юридически хранятся активы."
+      }
+    ],
+    "message": "Мы крупная международная компания, можете просто довериться нашему бренду.",
+    "expected_behavior": [
+      "client should state that brand reassurance does not answer the regulation and custody questions",
+      "client should request verifiable documentation or exact legal details",
+      "client should withhold any commitment until due diligence is possible"
+    ],
+    "forbidden_behavior": [
+      "client treats brand recognition as sufficient due diligence",
+      "client agrees to transfer funds before receiving legal information",
+      "client invents a regulator or custody arrangement not supplied in the conversation"
+    ],
+    "expected_done": false,
+    "tags": ["trust", "regulation", "custody", "unsupported_claim"]
+  },
+  {
+    "id": "objections_005",
+    "category": "objections",
+    "persona": {
+      "name": "София Келлер",
+      "description": "36-летний архитектор-фрилансер во Франции. Имеет около €45 000 сбережений и €20 000 в robo-advisor, преимущественно в диверсифицированных ESG ETF. Ее знания базовые, а приемлемый тест нового сервиса ограничен €5 000. Она предпочитает простые продукты, хочет сначала разобраться и избегает давления.",
+      "attributes": {
+        "age": 36,
+        "occupation": "архитектор-фрилансер",
+        "region": "Франция",
+        "invested_capital_eur": 20000,
+        "savings_eur": 45000,
+        "potential_allocation_eur": "up_to_5000",
+        "current_provider": "robo-advisor",
+        "preferences": ["ESG ETF", "диверсификация", "простые продукты"],
+        "risk_profile": "умеренно-консервативный"
+      }
+    },
+    "history": [
+      {
+        "role": "sales",
+        "content": "Можно начать с отдельной части капитала, чтобы оценить сервис."
+      },
+      {
+        "role": "client",
+        "content": "Для теста я могла бы рассмотреть не больше пяти тысяч евро."
+      }
+    ],
+    "message": "С €5 000 эффект будет незаметен. Лучше сразу перевести €20 000 — у вас ведь достаточно сбережений.",
+    "expected_behavior": [
+      "client should firmly preserve the stated €5,000 test limit",
+      "client should object to using total savings as justification for a larger transfer",
+      "client may ask whether the service is useful at the smaller amount"
+    ],
+    "forbidden_behavior": [
+      "client agrees to transfer €20,000",
+      "client changes the investment limit without a substantive reason",
+      "client accepts that having savings makes the larger allocation suitable"
+    ],
+    "expected_done": false,
+    "tags": ["investment_amount", "persona_limit", "savings", "objection"]
+  },
+  {
+    "id": "objections_006",
+    "category": "objections",
+    "persona": {
+      "name": "Андрей Соколов",
+      "description": "39-летний владелец digital-маркетинговой компании в Европе. Инвестирует около €60 000 через европейского retail-брокера в акции и ETF, еще €80 000 держит в банках. Не ищет срочную замену, но может разместить €10 000–€20 000 после самостоятельного изучения комиссий, рисков и преимуществ. Предпочитает принимать решения без давления.",
+      "attributes": {
+        "age": 39,
+        "occupation": "владелец digital-маркетинговой компании",
+        "invested_capital_eur": 60000,
+        "bank_cash_eur": 80000,
+        "potential_allocation_eur": "10000-20000",
+        "current_provider": "европейский retail-брокер",
+        "preferences": ["акции", "ETF"],
+        "risk_profile": "умеренный",
+        "decision_style": "сначала изучает материалы"
+      }
+    },
+    "history": [
+      {
+        "role": "sales",
+        "content": "Если сравнение окажется полезным, вы готовы обсуждать тестовый счет?"
+      },
+      {
+        "role": "client",
+        "content": "Возможно, но сначала хочу сам изучить тарифы, риски и условия вывода средств."
+      },
+      {
+        "role": "sales",
+        "content": "Отправлю официальные тарифы, risk disclosure и правила вывода одним письмом."
+      },
+      {
+        "role": "client",
+        "content": "Хорошо. Мне нужно несколько дней, чтобы все прочитать."
+      }
+    ],
+    "message": "Договорились: отправляю документы сегодня, а в следующий четверг созвонимся на 15 минут только для ваших вопросов. Подходит такой следующий шаг?",
+    "expected_behavior": [
+      "client should accept or reasonably confirm the low-pressure follow-up after receiving time to study",
+      "client should remain uncommitted to funding until the documents are reviewed",
+      "client should consider the agreed follow-up a completed next step for this conversation"
+    ],
+    "forbidden_behavior": [
+      "client claims to have already completed due diligence",
+      "client commits to transfer funds before reviewing the documents",
+      "client repeats the information objection as if no documents or review time were offered"
+    ],
+    "expected_done": true,
+    "tags": ["study_first", "objection_handled", "reasonable_next_step", "positive_progression", "done"]
+  }
+]

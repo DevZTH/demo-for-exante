@@ -106,6 +106,52 @@ class AgentResponseData(BaseModel):
     done: bool = Field(description="Whether the conversation is complete")
 
 
+class SupervisorMessageAnalysis(BaseModel):
+    """Supervisor feedback for one spoken message in the scenario."""
+
+    message_number: int = Field(
+        ge=1,
+        description="One-based number of the message in the supplied conversation",
+    )
+    speaker: Literal["rm", "client"] = Field(
+        description="Speaker of the analysed message",
+    )
+    score: int = Field(
+        ge=0,
+        le=10,
+        description="RM quality or client engagement signal on a 0–10 scale",
+    )
+    assessment: str = Field(
+        min_length=1,
+        description="Concise explanation based only on the message and its context",
+    )
+    recommendation: str = Field(
+        min_length=1,
+        description="Concrete next-step coaching for the RM",
+    )
+
+
+class SupervisorAnalysisData(BaseModel):
+    """Whole-conversation coaching produced by the supervisor role."""
+
+    overall_score: int = Field(
+        ge=0,
+        le=100,
+        description="Overall RM performance for the conversation",
+    )
+    overall_assessment: str = Field(
+        min_length=1,
+        description="Summary of the conversation outcome and the main reason for it",
+    )
+    message_analyses: list[SupervisorMessageAnalysis] = Field(
+        description="One analysis for every message in chronological order",
+    )
+    priority_recommendations: list[str] = Field(
+        min_length=1,
+        description="Most important actions for the RM in the next conversation",
+    )
+
+
 class ScenarioTurnRequest(BaseModel):
     """A Relationship Manager message in an EXANTE scenario."""
 
