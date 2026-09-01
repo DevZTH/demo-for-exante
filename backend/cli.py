@@ -22,10 +22,9 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from backend.app.providers import build_chat_model
 from backend.app.schemas import AgentResponseData, SupervisorAnalysisData
-from backend.app.supervisor_contract import (
-    INITIAL_SUPERVISOR_ANALYSIS_CONTRACT,
-    RETRY_SUPERVISOR_ANALYSIS_CONTRACT,
-    validate_supervisor_report_language,
+from backend.app.supervisor_analysis import (
+    analyze_history,
+    print_supervisor_analysis,
 )
 from backend.settings import Settings, get_settings
 
@@ -68,89 +67,6 @@ def read_system_prompt() -> str:
 def read_supervisor_prompt() -> str:
     """Load the coaching rules for the supervisor role."""
     return SUPERVISOR_PROMPT_PATH.read_text(encoding="utf-8")
-
-
-def format_history_for_analysis(history: Sequence[BaseMessage]) -> str:
-    """Make every spoken message explicit for a whole-conversation review."""
-    transcript: list[str] = []
-    for number, item in enumerate(history, start=1):
-        speaker = "rm" if isinstance(item, HumanMessage) else "client"
-        content = item.content if isinstance(item.content, str) else str(item.content)
-        transcript.append(f"{number}. [{speaker}]\n{content}")
-    return "\n\n".join(transcript)
-
-
-def print_supervisor_analysis(analysis: SupervisorAnalysisData) -> None:
-    """Render structured supervisor output for the terminal."""
-    print("\nРазбор супервайзера")
-    print(f"Итоговая оценка RM: {analysis.overall_score}/100")
-    print(f"Итог: {analysis.overall_assessment}")
-    print("\nРазбор реплик:")
-    for item in analysis.message_analyses:
-        speaker = "RM" if item.speaker == "rm" else "Клиент"
-        score_label = "Оценка" if item.speaker == "rm" else "Сигнал"
-        print(f"{item.message_number}. {speaker} — {score_label}: {item.score}/10")
-        print(f"   Разбор: {item.assessment}")
-        print(f"   Рекомендация: {item.recommendation}")
-
-    print("\nПриоритетные рекомендации:")
-    for number, recommendation in enumerate(analysis.priority_recommendations, start=1):
-        print(f"{number}. {recommendation}")
-
-
-async def analyze_history(
-    *,
-    history: Sequence[BaseMessage],
-    supervisor_chain: object,
-    supervisor_prompt: str,
-    customer_profile: str,
-) -> SupervisorAnalysisData:
-    """Ask the supervisor to analyse all messages collected in this CLI session."""
-    invoke = getattr(supervisor_chain, "ainvoke")
-    request = {
-        "supervisor_prompt": supervisor_prompt,
-        "customer_profile": customer_profile,
-        "conversation": format_history_for_analysis(history),
-    }
-    contracts = (
-        INITIAL_SUPERVISOR_ANALYSIS_CONTRACT,
-        RETRY_SUPERVISOR_ANALYSIS_CONTRACT,
-    )
-    for contract in contracts:
-        result = await invoke({**request, "analysis_contract": contract})
-        try:
-            analysis = (
-                result
-                if isinstance(result, SupervisorAnalysisData)
-                else SupervisorAnalysisData.model_validate(result)
-            )
-            _validate_message_analyses(analysis, history)
-            validate_supervisor_report_language(analysis)
-            return analysis
-        except ValueError:
-            if contract == contracts[-1]:
-                raise
-
-    raise RuntimeError("Не удалось сформировать отчёт супервайзера")
-
-
-def _validate_message_analyses(
-    analysis: SupervisorAnalysisData,
-    history: Sequence[BaseMessage],
-) -> None:
-    """Require the model to honour the per-message analysis contract."""
-    expected = [
-        (number, "rm" if isinstance(message, HumanMessage) else "client")
-        for number, message in enumerate(history, start=1)
-    ]
-    actual = [
-        (item.message_number, item.speaker)
-        for item in analysis.message_analyses
-    ]
-    if actual != expected:
-        raise ValueError(
-            "супервайзер должен разобрать каждую реплику в исходном порядке"
-        )
 
 
 async def run_chat(*, show_signal: bool) -> None:

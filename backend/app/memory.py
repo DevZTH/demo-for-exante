@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from collections.abc import Sequence
 from typing import Any
 
@@ -8,7 +7,7 @@ from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.embeddings import Embeddings
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 
-from backend.app.domain import MessageRecord
+from backend.app.domain import MessageRecord, assistant_reply_or_fallback
 from backend.app.storage import ChatRepository
 
 
@@ -112,10 +111,7 @@ def visible_content_for_role(role: str, content: str) -> str:
     if role != "assistant":
         return content
 
-    try:
-        payload = json.loads(content)
-    except json.JSONDecodeError:
-        return "Ответ клиента из предыдущего сообщения недоступен."
-
-    reply = payload.get("reply") if isinstance(payload, dict) else None
-    return reply if isinstance(reply, str) else "Ответ клиента из предыдущего сообщения недоступен."
+    return assistant_reply_or_fallback(
+        content,
+        fallback="Ответ клиента из предыдущего сообщения недоступен.",
+    )

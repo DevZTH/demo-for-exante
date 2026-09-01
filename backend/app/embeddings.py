@@ -1,3 +1,4 @@
+"""Stuff for embedding text into vectors for semantic memory."""
 from __future__ import annotations
 
 import hashlib
@@ -5,7 +6,6 @@ import math
 import re
 
 from langchain_core.embeddings import Embeddings
-
 
 class LocalHashEmbeddings(Embeddings):
     """Deterministic local embeddings for the scenario's semantic memory.

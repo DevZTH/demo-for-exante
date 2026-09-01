@@ -2,23 +2,23 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
-from backend.app.domain import MessageRecord, ScenarioTurn, SemanticMatch
+from backend.app.domain import (
+    MessageRecord,
+    ScenarioTurn,
+    SemanticMatch,
+    assistant_reply_or_fallback,
+)
 from backend.app.embeddings import LocalHashEmbeddings
 from backend.app.memory import SQLiteScenarioMessageHistory
 from backend.app.providers import build_chat_model
 from backend.app.schemas import AgentResponseData, SupervisorAnalysisData
 from backend.app.storage import ChatRepository, ScenarioNotFoundError
-from backend.app.supervisor_contract import (
-    INITIAL_SUPERVISOR_ANALYSIS_CONTRACT,
-    RETRY_SUPERVISOR_ANALYSIS_CONTRACT,
-    validate_supervisor_report_language,
-)
+from backend.app.supervisor_analysis import analyze_persisted_scenario
 from backend.settings import Settings
 
 
@@ -41,43 +41,13 @@ class AgentService:
 
     async def analyze_scenario(self, scenario_id: str) -> SupervisorAnalysisData:
         """Produce coaching for every visible message in one saved scenario."""
-        self.repository.require_scenario(scenario_id)
-        messages = [
-            message
-            for message in self.repository.list_messages(scenario_id)
-            if message.role in {"user", "assistant"}
-        ]
-        if not messages:
-            raise ValueError("Невозможно проанализировать сценарий без реплик.")
-
-        request = {
-            "supervisor_prompt": self._get_supervisor_prompt(),
-            "customer_profile": self._get_agent_system_prompt(),
-            "conversation": self._format_conversation_for_supervisor(messages),
-        }
-        contracts = (
-            INITIAL_SUPERVISOR_ANALYSIS_CONTRACT,
-            RETRY_SUPERVISOR_ANALYSIS_CONTRACT,
+        return await analyze_persisted_scenario(
+            scenario_id=scenario_id,
+            repository=self.repository,
+            supervisor_chain=self.supervisor_chain,
+            get_supervisor_prompt=self._get_supervisor_prompt,
+            get_customer_profile=self._get_agent_system_prompt,
         )
-        for contract in contracts:
-            result = await self.supervisor_chain.ainvoke(
-                {**request, "analysis_contract": contract},
-                config={"run_name": "analyze-scenario"},
-            )
-            try:
-                analysis = (
-                    result
-                    if isinstance(result, SupervisorAnalysisData)
-                    else SupervisorAnalysisData.model_validate(result)
-                )
-                self._validate_supervisor_analysis(analysis, messages)
-                validate_supervisor_report_language(analysis)
-                return analysis
-            except ValueError:
-                if contract == contracts[-1]:
-                    raise
-
-        raise RuntimeError("Не удалось сформировать отчёт супервайзера")
 
     async def process_message(
         self,
@@ -307,36 +277,6 @@ class AgentService:
         )
 
     @staticmethod
-    def _format_conversation_for_supervisor(messages: Sequence[MessageRecord]) -> str:
-        """Render persisted messages in the same explicit format as the CLI."""
-        transcript: list[str] = []
-        for number, message in enumerate(messages, start=1):
-            speaker = "rm" if message.role == "user" else "client"
-            transcript.append(
-                f"{number}. [{speaker}]\n{_visible_context_content(message)}"
-            )
-        return "\n\n".join(transcript)
-
-    @staticmethod
-    def _validate_supervisor_analysis(
-        analysis: SupervisorAnalysisData,
-        messages: Sequence[MessageRecord],
-    ) -> None:
-        """Require coaching feedback for every message, in chronological order."""
-        expected = [
-            (number, "rm" if message.role == "user" else "client")
-            for number, message in enumerate(messages, start=1)
-        ]
-        actual = [
-            (item.message_number, item.speaker)
-            for item in analysis.message_analyses
-        ]
-        if actual != expected:
-            raise ValueError(
-                "супервайзер должен разобрать каждую реплику в исходном порядке"
-            )
-
-    @staticmethod
     def _saved_turn(records: list[MessageRecord]) -> tuple[MessageRecord, MessageRecord]:
         """Extract saved user and assistant messages from records."""
         user_message = next((record for record in records if record.role == "user"), None)
@@ -361,7 +301,8 @@ def _visible_context_content(message: MessageRecord) -> str:
     if message.role != "assistant":
         return message.content
 
-    try:
-        return AgentResponseData.model_validate_json(message.content).reply
-    except ValueError:
-        return "Ответ клиента из предыдущего сообщения недоступен."
+    return assistant_reply_or_fallback(
+        message.content,
+        fallback="Ответ клиента из предыдущего сообщения недоступен.",
+        parser=AgentResponseData.model_validate_json,
+    )

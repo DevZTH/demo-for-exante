@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Request, status
 
+from backend.app.api_errors import supervisor_analysis_error
 from backend.app.agent_service import AgentService
+from backend.app.domain import ScenarioRecord
+from backend.app.scenario_access import get_existing_scenario, scenario_not_found_error
 from backend.app.schemas import (
     MessageResponse,
     ScenarioResponse,
@@ -25,6 +28,13 @@ def get_repository(request: Request) -> ChatRepository:
 
 def get_agent_service(request: Request) -> AgentService:
     return request.app.state.agent_service
+
+
+def get_existing_scenario_dependency(
+    scenario_id: str,
+    repository: ChatRepository = Depends(get_repository),
+) -> ScenarioRecord:
+    return get_existing_scenario(scenario_id, repository)
 
 
 router = APIRouter(tags=["scenarios"])
@@ -63,10 +73,7 @@ async def create_scenario_turn(
             metadata=request.metadata,
         )
     except ScenarioNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Scenario not found",
-        ) from exc
+        raise scenario_not_found_error() from exc
 
     return ScenarioTurnResponse.from_turn_and_agent(turn, agent_response)
 
@@ -82,16 +89,8 @@ async def analyze_scenario(
     """Run the sales supervisor over the full persisted scenario history."""
     try:
         return await service.analyze_scenario(scenario_id)
-    except ScenarioNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Scenario not found",
-        ) from exc
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=str(exc),
-        ) from exc
+    except (ScenarioNotFoundError, ValueError) as exc:
+        raise supervisor_analysis_error(exc) from exc
 
 
 @router.get("/scenarios", response_model=list[ScenarioResponse])
@@ -106,32 +105,26 @@ def list_scenarios(
 
 @router.get("/scenarios/{scenario_id}", response_model=ScenarioResponse)
 def get_scenario(
-    scenario_id: str,
-    repository: ChatRepository = Depends(get_repository),
+    scenario: ScenarioRecord = Depends(get_existing_scenario_dependency),
 ) -> ScenarioResponse:
-    scenario = repository.get_scenario(scenario_id)
-    if scenario is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scenario not found")
     return ScenarioResponse.from_record(scenario)
 
 
 @router.delete("/scenarios/{scenario_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_scenario(
-    scenario_id: str,
+    scenario: ScenarioRecord = Depends(get_existing_scenario_dependency),
     repository: ChatRepository = Depends(get_repository),
 ) -> None:
-    if not repository.delete_scenario(scenario_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scenario not found")
+    if not repository.delete_scenario(scenario.id):
+        raise scenario_not_found_error()
 
 
 @router.get("/scenarios/{scenario_id}/messages", response_model=list[MessageResponse])
 def list_scenario_messages(
-    scenario_id: str,
+    scenario: ScenarioRecord = Depends(get_existing_scenario_dependency),
     repository: ChatRepository = Depends(get_repository),
 ) -> list[MessageResponse]:
-    if repository.get_scenario(scenario_id) is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scenario not found")
     return [
         MessageResponse.from_record(message)
-        for message in repository.list_messages(scenario_id)
+        for message in repository.list_messages(scenario.id)
     ]

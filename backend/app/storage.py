@@ -136,16 +136,7 @@ class ChatRepository:
 
     def delete_scenario(self, scenario_id: str) -> bool:
         with self._connect() as conn:
-            if self.vector_enabled:
-                message_ids = [
-                    row["id"]
-                    for row in conn.execute(
-                        "SELECT id FROM messages WHERE chat_id = ?",
-                        (scenario_id,),
-                    ).fetchall()
-                ]
-                for message_id in message_ids:
-                    conn.execute("DELETE FROM message_vectors WHERE rowid = ?", (message_id,))
+            self._delete_vectors_for_chat(conn, scenario_id)
 
             cursor = conn.execute("DELETE FROM chats WHERE id = ?", (scenario_id,))
             conn.commit()
@@ -156,16 +147,7 @@ class ChatRepository:
         now = self._now()
 
         with self._connect() as conn:
-            if self.vector_enabled:
-                message_ids = [
-                    row["id"]
-                    for row in conn.execute(
-                        "SELECT id FROM messages WHERE chat_id = ?",
-                        (chat_id,),
-                    ).fetchall()
-                ]
-                for message_id in message_ids:
-                    conn.execute("DELETE FROM message_vectors WHERE rowid = ?", (message_id,))
+            self._delete_vectors_for_chat(conn, chat_id)
 
             cursor = conn.execute("DELETE FROM messages WHERE chat_id = ?", (chat_id,))
             conn.execute(
@@ -339,6 +321,17 @@ class ChatRepository:
             sqlite_vec.load(conn)
         finally:
             conn.enable_load_extension(False)
+
+    def _delete_vectors_for_chat(self, conn: sqlite3.Connection, chat_id: str) -> None:
+        if not self.vector_enabled:
+            return
+
+        message_ids = conn.execute(
+            "SELECT id FROM messages WHERE chat_id = ?",
+            (chat_id,),
+        ).fetchall()
+        for row in message_ids:
+            conn.execute("DELETE FROM message_vectors WHERE rowid = ?", (row["id"],))
 
     @staticmethod
     def _now() -> str:

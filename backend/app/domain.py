@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -37,3 +39,19 @@ class ScenarioTurn:
     context: list[SemanticMatch]
     provider: str
     model: str
+
+
+def assistant_reply_or_fallback(
+    content: str,
+    *,
+    fallback: str,
+    parser: Callable[[str], object] | None = None,
+) -> str:
+    """Return a stored assistant reply without exposing its internal state."""
+    try:
+        payload = parser(content) if parser else json.loads(content)
+    except ValueError:
+        return fallback
+
+    reply = payload.get("reply") if isinstance(payload, dict) else getattr(payload, "reply", None)
+    return reply if isinstance(reply, str) else fallback

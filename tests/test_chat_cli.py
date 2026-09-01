@@ -1,13 +1,25 @@
 from __future__ import annotations
 
 import asyncio
-from types import SimpleNamespace
+from dataclasses import dataclass
 
-from langchain_core.messages import AIMessage, HumanMessage
-
-from backend import cli
-from backend.app.schemas import AgentResponseData, SupervisorAnalysisData
+from backend.app import supervisor_analysis as supervisor
+from backend.app.schemas import SupervisorAnalysisData
 from backend.app.supervisor_contract import RETRY_SUPERVISOR_ANALYSIS_CONTRACT
+
+
+@dataclass(frozen=True)
+class ChatMessage:
+    content: str
+    type: str
+
+
+def human_message(content: str) -> ChatMessage:
+    return ChatMessage(content=content, type="human")
+
+
+def ai_message(content: str) -> ChatMessage:
+    return ChatMessage(content=content, type="ai")
 
 
 class StubChain:
@@ -49,10 +61,10 @@ def supervisor_analysis() -> SupervisorAnalysisData:
 
 
 def test_format_history_for_analysis_preserves_every_message() -> None:
-    transcript = cli.format_history_for_analysis(
+    transcript = supervisor.format_history_for_analysis(
         [
-            HumanMessage(content="Что важно в текущем брокере?"),
-            AIMessage(content="Мне нравятся низкие комиссии."),
+            human_message("Что важно в текущем брокере?"),
+            ai_message("Мне нравятся низкие комиссии."),
         ]
     )
 
@@ -64,10 +76,10 @@ def test_format_history_for_analysis_preserves_every_message() -> None:
 
 def test_analyze_history_sends_full_transcript_to_supervisor() -> None:
     chain = StubChain(supervisor_analysis())
-    history = [HumanMessage(content="Здравствуйте"), AIMessage(content="Добрый день")]
+    history = [human_message("Здравствуйте"), ai_message("Добрый день")]
 
     result = asyncio.run(
-        cli.analyze_history(
+        supervisor.analyze_history(
             history=history,
             supervisor_chain=chain,
             supervisor_prompt="supervisor rules",
@@ -89,8 +101,8 @@ def test_analyze_history_rejects_incomplete_message_review() -> None:
 
     try:
         asyncio.run(
-            cli.analyze_history(
-                history=[HumanMessage(content="Здравствуйте"), AIMessage(content="Добрый день")],
+            supervisor.analyze_history(
+                history=[human_message("Здравствуйте"), ai_message("Добрый день")],
                 supervisor_chain=chain,
                 supervisor_prompt="supervisor rules",
                 customer_profile="customer profile",
@@ -105,35 +117,10 @@ def test_analyze_history_rejects_incomplete_message_review() -> None:
     assert chain.calls[1]["analysis_contract"] == RETRY_SUPERVISOR_ANALYSIS_CONTRACT
 
 
-def test_analyze_command_prints_supervisor_report(monkeypatch, capsys) -> None:
-    customer_chain = StubChain(
-        AgentResponseData(
-            reply="Мне интересны комиссии.",
-            intetions="Я осторожно изучаю варианты.",
-            state="curious",
-            trust=50,
-            purchase_probability=30,
-            done=False,
-        )
-    )
-    analysis_chain = StubChain(supervisor_analysis())
-    commands = iter(["Здравствуйте", "/analyze", "/quit"])
-
-    monkeypatch.setattr(cli, "get_settings", lambda: SimpleNamespace(
-        llm_model="test-model", llm_base_url="http://test"
-    ))
-    monkeypatch.setattr(cli, "build_chain", lambda _settings: customer_chain)
-    monkeypatch.setattr(cli, "build_supervisor_chain", lambda _settings: analysis_chain)
-    monkeypatch.setattr(cli, "read_system_prompt", lambda: "customer profile")
-    monkeypatch.setattr(cli, "read_supervisor_prompt", lambda: "supervisor rules")
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(commands))
-
-    asyncio.run(cli.run_chat(show_signal=False))
+def test_print_supervisor_analysis(capsys) -> None:
+    supervisor.print_supervisor_analysis(supervisor_analysis())
 
     output = capsys.readouterr().out
     assert "Итоговая оценка RM: 82/100" in output
     assert "1. RM — Оценка: 8/10" in output
     assert "2. Клиент — Сигнал: 5/10" in output
-    assert analysis_chain.calls[0]["conversation"] == (
-        "1. [rm]\nЗдравствуйте\n\n2. [client]\nМне интересны комиссии."
-    )

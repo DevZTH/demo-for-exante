@@ -3,12 +3,11 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from fastapi import HTTPException
 
-from backend.app.agent_service import AgentService
-from backend.app.api import analyze_scenario
+from backend.app.api_errors import supervisor_analysis_error
 from backend.app.schemas import AgentResponseData, SupervisorAnalysisData
 from backend.app.storage import ChatRepository, ScenarioNotFoundError
+from backend.app.supervisor_analysis import analyze_persisted_scenario
 from backend.app.supervisor_contract import RETRY_SUPERVISOR_ANALYSIS_CONTRACT
 from backend.settings import Settings
 
@@ -49,7 +48,7 @@ def analysis() -> SupervisorAnalysisData:
     )
 
 
-def make_service(tmp_path, chain: StubSupervisorChain) -> tuple[AgentService, str]:
+def make_analysis_request(tmp_path, chain: StubSupervisorChain):
     settings = Settings(
         sqlite_path=tmp_path / "scenario.sqlite3",
         chat_storage_mode="sqlite",
@@ -71,19 +70,20 @@ def make_service(tmp_path, chain: StubSupervisorChain) -> tuple[AgentService, st
         ).model_dump_json(),
     )
 
-    service = AgentService.__new__(AgentService)
-    service.repository = repository
-    service.supervisor_chain = chain
-    service._get_agent_system_prompt = lambda: "customer profile"
-    service._get_supervisor_prompt = lambda: "supervisor rules"
-    return service, scenario.id
+    return {
+        "scenario_id": scenario.id,
+        "repository": repository,
+        "supervisor_chain": chain,
+        "get_customer_profile": lambda: "customer profile",
+        "get_supervisor_prompt": lambda: "supervisor rules",
+    }
 
 
 def test_analyze_scenario_uses_visible_persisted_messages(tmp_path) -> None:
     chain = StubSupervisorChain(analysis())
-    service, scenario_id = make_service(tmp_path, chain)
+    request = make_analysis_request(tmp_path, chain)
 
-    result = asyncio.run(service.analyze_scenario(scenario_id))
+    result = asyncio.run(analyze_persisted_scenario(**request))
 
     assert result.overall_score == 82
     assert {key: value for key, value in chain.calls[0].items() if key != "analysis_contract"} == {
@@ -99,13 +99,13 @@ def test_analyze_scenario_uses_visible_persisted_messages(tmp_path) -> None:
 
 def test_analyze_scenario_requires_complete_message_review(tmp_path) -> None:
     incomplete = analysis().model_copy(update={"message_analyses": [analysis().message_analyses[0]]})
-    service, scenario_id = make_service(tmp_path, StubSupervisorChain(incomplete))
+    request = make_analysis_request(tmp_path, StubSupervisorChain(incomplete))
 
     with pytest.raises(ValueError, match="каждую реплику"):
-        asyncio.run(service.analyze_scenario(scenario_id))
+        asyncio.run(analyze_persisted_scenario(**request))
 
-    assert len(service.supervisor_chain.calls) == 2
-    assert service.supervisor_chain.calls[1]["analysis_contract"] == RETRY_SUPERVISOR_ANALYSIS_CONTRACT
+    assert len(request["supervisor_chain"].calls) == 2
+    assert request["supervisor_chain"].calls[1]["analysis_contract"] == RETRY_SUPERVISOR_ANALYSIS_CONTRACT
 
 
 def test_analyze_scenario_retries_incomplete_supervisor_report(tmp_path) -> None:
@@ -122,9 +122,9 @@ def test_analyze_scenario_retries_incomplete_supervisor_report(tmp_path) -> None
             return self.results.pop(0)
 
     chain = RetryingChain()
-    service, scenario_id = make_service(tmp_path, chain)  # type: ignore[arg-type]
+    request = make_analysis_request(tmp_path, chain)
 
-    result = asyncio.run(service.analyze_scenario(scenario_id))
+    result = asyncio.run(analyze_persisted_scenario(**request))
 
     assert result == complete
     assert len(chain.calls) == 2
@@ -151,9 +151,9 @@ def test_analyze_scenario_retries_english_supervisor_report(tmp_path) -> None:
             return self.results.pop(0)
 
     chain = RetryingChain()
-    service, scenario_id = make_service(tmp_path, chain)  # type: ignore[arg-type]
+    request = make_analysis_request(tmp_path, chain)
 
-    result = asyncio.run(service.analyze_scenario(scenario_id))
+    result = asyncio.run(analyze_persisted_scenario(**request))
 
     assert result == complete
     assert len(chain.calls) == 2
@@ -164,49 +164,18 @@ def test_analyze_scenario_rejects_unknown_scenario(tmp_path) -> None:
     settings = Settings(sqlite_path=tmp_path / "scenario.sqlite3", chat_storage_mode="sqlite")
     repository = ChatRepository(settings)
     repository.init_db()
-    service = AgentService.__new__(AgentService)
-    service.repository = repository
-
     with pytest.raises(ScenarioNotFoundError):
-        asyncio.run(service.analyze_scenario("missing"))
+        asyncio.run(
+            analyze_persisted_scenario(
+                scenario_id="missing",
+                repository=repository,
+                supervisor_chain=StubSupervisorChain(analysis()),
+                get_customer_profile=lambda: "customer profile",
+                get_supervisor_prompt=lambda: "supervisor rules",
+            )
+        )
 
 
-class StubAnalysisService:
-    def __init__(self, result: SupervisorAnalysisData | Exception) -> None:
-        self.result = result
-        self.requested_scenario_ids: list[str] = []
-
-    async def analyze_scenario(self, scenario_id: str) -> SupervisorAnalysisData:
-        self.requested_scenario_ids.append(scenario_id)
-        if isinstance(self.result, Exception):
-            raise self.result
-        return self.result
-
-
-def test_analysis_api_returns_supervisor_report() -> None:
-    service = StubAnalysisService(analysis())
-
-    result = asyncio.run(analyze_scenario("scenario-1", service=service))
-
-    assert result.overall_score == 82
-    assert service.requested_scenario_ids == ["scenario-1"]
-
-
-def test_analysis_api_returns_not_found_for_missing_scenario() -> None:
-    service = StubAnalysisService(ScenarioNotFoundError("missing"))
-
-    with pytest.raises(HTTPException) as error:
-        asyncio.run(analyze_scenario("missing", service=service))
-
-    assert error.value.status_code == 404
-
-
-def test_analysis_api_returns_validation_error_for_empty_scenario() -> None:
-    service = StubAnalysisService(
-        ValueError("Невозможно проанализировать сценарий без реплик.")
-    )
-
-    with pytest.raises(HTTPException) as error:
-        asyncio.run(analyze_scenario("empty", service=service))
-
-    assert error.value.status_code == 422
+def test_supervisor_analysis_errors_are_mapped_to_http_responses() -> None:
+    assert supervisor_analysis_error(ScenarioNotFoundError("missing")).status_code == 404
+    assert supervisor_analysis_error(ValueError("empty scenario")).status_code == 422

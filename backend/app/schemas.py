@@ -1,12 +1,17 @@
 from __future__ import annotations
 
-import json
 from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from backend.app.domain import MessageRecord, ScenarioRecord, ScenarioTurn, SemanticMatch
+from backend.app.domain import (
+    MessageRecord,
+    ScenarioRecord,
+    ScenarioTurn,
+    SemanticMatch,
+    assistant_reply_or_fallback,
+)
 
 
 class ScenarioResponse(BaseModel):
@@ -47,16 +52,14 @@ class MessageResponse(BaseModel):
 
 def _visible_content(record: MessageRecord) -> str:
     """Do not expose the customer model's internal state as message text."""
-    if record.role != "assistant":
-        return record.content
-
-    try:
-        payload = json.loads(record.content)
-    except json.JSONDecodeError:
-        return "Ответ клиента недоступен."
-
-    reply = payload.get("reply") if isinstance(payload, dict) else None
-    return reply if isinstance(reply, str) else "Ответ клиента недоступен."
+    return (
+        assistant_reply_or_fallback(
+            record.content,
+            fallback="Ответ клиента недоступен.",
+        )
+        if record.role == "assistant"
+        else record.content
+    )
 
 
 class SemanticMatchResponse(BaseModel):
