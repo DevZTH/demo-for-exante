@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import importlib.util
+import os
 from pathlib import Path
 import sys
 from typing import Sequence
@@ -16,6 +18,31 @@ from typing import Sequence
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+
+def ensure_project_dependencies() -> None:
+    """Restart through the project venv when the active Python lacks CLI deps."""
+    required_modules = ("langchain_core", "langchain_openai")
+    if all(importlib.util.find_spec(module) is not None for module in required_modules):
+        return
+
+    venv_python = PROJECT_ROOT / ".venv" / "bin" / "python"
+    if venv_python.is_file() and os.access(venv_python, os.X_OK):
+        os.chdir(PROJECT_ROOT)
+        os.execv(
+            str(venv_python),
+            [str(venv_python), "-m", "backend.cli", *sys.argv[1:]],
+        )
+
+    missing = ", ".join(required_modules)
+    raise SystemExit(
+        f"Не найдены зависимости ({missing}). Создайте .venv и установите их:\n"
+        "  python -m venv .venv\n"
+        "  .venv/bin/python -m pip install -r backend/requirements.txt"
+    )
+
+
+ensure_project_dependencies()
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder

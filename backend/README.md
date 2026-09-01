@@ -9,18 +9,19 @@ FastAPI backend для тренировки Relationship Manager в диалог
 
 ```bash
 cd /home/devz/exante_demo
-source .venv/bin/activate
-python -m backend.cli
+bash backend/run_cli.sh
 ```
 
-Если текущая директория уже `backend/`, используйте `python -m cli`.
+Launcher использует `.venv/bin/python`, поэтому не зависит от того, активировано
+ли виртуальное окружение в текущем shell. Если `.venv` ещё нет, сначала выполните
+команды установки из раздела «Запуск».
 
 Команды в чате: `/analyze` — разобрать весь текущий диалог супервайзером,
 `/reset` — начать новый диалог, `/quit` — завершить. По умолчанию выводится
 только видимая реплика клиента; для оценочного сигнала добавьте `--show-signal`:
 
 ```bash
-python -m backend.cli --show-signal
+bash backend/run_cli.sh --show-signal
 ```
 
 `/analyze` использует отдельную роль супервайзера и выводит оценку RM по шкале

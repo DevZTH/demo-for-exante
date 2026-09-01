@@ -1,0 +1,328 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="2010" viewBox="0 0 1920 2010" role="img" aria-labelledby="title desc">
+  <title id="title">Архитектура аватара клиента EXANTE Scenario Trainer</title>
+  <desc id="desc">Схема объясняет внутренний runtime аватара клиента, работу супервайзера, целевой жизненный цикл персон и сценариев, происхождение оценок и контур проверки качества и регрессий. Сплошные блоки реализованы в проекте, пунктирные обозначают целевое развитие.</desc>
+  <style>
+    :root { color-scheme: light; }
+    .bg { fill: #f6f8fc; }
+    .lane { fill: #ffffff; stroke: #d7dfeb; stroke-width: 1.5; }
+    .title { font: 700 34px Inter, Arial, sans-serif; fill: #17243b; }
+    .subtitle { font: 400 16px Inter, Arial, sans-serif; fill: #5d6d84; }
+    .lane-title { font: 700 17px Inter, Arial, sans-serif; fill: #516078; letter-spacing: 1.1px; }
+    .node { stroke-width: 1.5; }
+    .target { stroke-width: 2; stroke-dasharray: 8 6; }
+    .node-title { font: 700 17px Inter, Arial, sans-serif; fill: #17243b; }
+    .node-text { font: 400 13px Inter, Arial, sans-serif; fill: #40506a; }
+    .node-code { font: 600 12.5px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #33415c; }
+    .small { font: 400 11.5px Inter, Arial, sans-serif; fill: #5b6b82; }
+    .note { font: 600 12.5px Inter, Arial, sans-serif; fill: #43536c; }
+    .warning { font: 600 12.5px Inter, Arial, sans-serif; fill: #9d3e48; }
+    .edge { fill: none; stroke: #71809a; stroke-width: 2; marker-end: url(#arrow); }
+    .edge-dashed { fill: none; stroke: #71809a; stroke-width: 1.8; stroke-dasharray: 7 6; marker-end: url(#arrow); }
+    .memory-edge { fill: none; stroke: #5f9f70; stroke-width: 2; marker-end: url(#arrow-green); }
+    .edge-label { font: 600 11.5px Inter, Arial, sans-serif; fill: #526178; }
+    .badge-text { font: 700 10px Inter, Arial, sans-serif; fill: #ffffff; letter-spacing: .5px; }
+    .footer { font: 400 11px Inter, Arial, sans-serif; fill: #66758b; }
+  </style>
+  <defs>
+    <filter id="shadow" x="-15%" y="-15%" width="130%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#253858" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#71809a"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#5f9f70"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1920" height="2010"/>
+  <text class="title" x="56" y="55">Agent architecture — аватар клиента, артефакты, оценка и контроль качества</text>
+  <text class="subtitle" x="56" y="84">EXANTE Scenario Trainer · текущее состояние проекта и целевой контур для масштабирования на десятки персон и сценариев</text>
+
+  <!-- Legend -->
+  <line x1="1435" y1="45" x2="1490" y2="45" stroke="#71809a" stroke-width="2"/>
+  <text class="small" x="1502" y="49">реализовано сейчас</text>
+  <line x1="1658" y1="45" x2="1713" y2="45" stroke="#71809a" stroke-width="2" stroke-dasharray="8 6"/>
+  <text class="small" x="1725" y="49">целевая архитектура</text>
+  <rect x="1435" y="62" width="20" height="12" rx="3" fill="#fff0f1" stroke="#ed9399"/>
+  <text class="small" x="1466" y="73">выявленный разрыв</text>
+
+  <!-- Lane 1: Runtime -->
+  <rect class="lane" x="38" y="112" width="1844" height="350" rx="20"/>
+  <text class="lane-title" x="66" y="151">1 · КАК РАБОТАЕТ АВАТАР КЛИЕНТА ВНУТРИ</text>
+
+  <!-- Avatar data flow -->
+  <rect x="68" y="184" width="190" height="102" rx="12" fill="#e9f2ff" stroke="#8bb8ff" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="88" y="215">1. Вопрос RM</text>
+  <text class="node-code" x="88" y="238">React / CLI</text>
+  <text class="node-text" x="88" y="264">message + scenario_id?</text>
+
+  <rect x="288" y="184" width="240" height="102" rx="12" fill="#e8fbf5" stroke="#67c9a7" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="308" y="215">2. Оркестрация</text>
+  <text class="node-code" x="308" y="238">FastAPI → AgentService</text>
+  <text class="node-text" x="308" y="264">create / require scenario</text>
+
+  <rect x="588" y="184" width="340" height="102" rx="12" fill="#fff6df" stroke="#efbb54" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="608" y="215">3. Сборка контекста и prompt</text>
+  <text class="node-code" x="608" y="238">ChatPromptTemplate</text>
+  <text class="node-text" x="608" y="262">customer.md + history + semantic matches + input</text>
+
+  <rect x="988" y="184" width="230" height="102" rx="12" fill="#fff1e6" stroke="#f3a567" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="1008" y="215">4. Генерация</text>
+  <text class="node-code" x="1008" y="238">ChatOpenAI.ainvoke</text>
+  <text class="node-text" x="1008" y="264">OpenAI-compatible LLM</text>
+
+  <rect x="1278" y="184" width="290" height="102" rx="12" fill="#f2edff" stroke="#ac9be8" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="1298" y="215">5. Структурированный результат</text>
+  <text class="node-code" x="1298" y="238">AgentResponseData → Pydantic</text>
+  <text class="node-text" x="1298" y="262">reply · intetions · state · trust · probability · done</text>
+
+  <rect x="1628" y="184" width="226" height="102" rx="12" fill="#eef5ff" stroke="#7da9e8" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="1648" y="215">6. Ответ системы</text>
+  <text class="node-code" x="1648" y="238">ScenarioTurnResponse</text>
+  <text class="node-text" x="1648" y="262">reply + signal → UI</text>
+
+  <path class="edge" d="M258 235 H288"/>
+  <path class="edge" d="M528 235 H588"/>
+  <path class="edge" d="M928 235 H988"/>
+  <path class="edge" d="M1218 235 H1278"/>
+  <path class="edge" d="M1568 235 H1628"/>
+  <text class="edge-label" x="538" y="220">собрать</text>
+  <text class="edge-label" x="938" y="220">prompt</text>
+  <text class="edge-label" x="1229" y="220">JSON</text>
+  <text class="edge-label" x="1576" y="220">validated</text>
+
+  <rect x="560" y="326" width="780" height="82" rx="12" fill="#eef9e9" stroke="#88c971" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="582" y="355">Память и хранилище</text>
+  <text class="node-code" x="582" y="378">SQLiteScenarioMessageHistory · ChatRepository · LocalHashEmbeddings · sqlite_vec</text>
+  <text class="small" x="582" y="399">читает окно N и top K совпадений; сохраняет вопрос RM, полный JSON клиента и metadata</text>
+
+  <path class="memory-edge" d="M408 286 V367 H560"/>
+  <text class="edge-label" x="332" y="316">load scenario · query memory</text>
+  <path class="memory-edge" d="M790 326 V286"/>
+  <text class="edge-label" x="802" y="312">history + matches</text>
+  <path class="memory-edge" d="M1423 286 V367 H1340"/>
+  <text class="edge-label" x="1356" y="316">persist turn</text>
+
+  <text class="note" x="68" y="432">Основной поток: 1 → 2 → 3 → 4 → 5 → 6. Нижний контур сначала читает память для prompt, затем записывает завершённый turn.</text>
+  <text class="warning" x="68" y="452">State machine нет: скрытые state/trust/probability генерирует LLM; в следующий контекст из ответа клиента возвращается только видимый reply.</text>
+
+  <!-- Lane 2: Supervisor flow -->
+  <rect class="lane" x="38" y="482" width="1844" height="330" rx="20"/>
+  <text class="lane-title" x="66" y="521">2 · КАК РАБОТАЕТ СУПЕРВАЙЗЕР</text>
+
+  <rect x="68" y="552" width="190" height="118" rx="12" fill="#e9f2ff" stroke="#8bb8ff" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="88" y="583">1. Триггер</text>
+  <text class="node-code" x="88" y="606">UI / agent_response.done</text>
+  <text class="node-text" x="88" y="632">ручной или автоанализ</text>
+  <text class="small" x="88" y="652">scenario_id</text>
+
+  <rect x="288" y="552" width="245" height="118" rx="12" fill="#e8fbf5" stroke="#67c9a7" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="308" y="583">2. API и сервис</text>
+  <text class="node-code" x="308" y="606">POST /scenarios/{id}/analysis</text>
+  <text class="node-text" x="308" y="632">AgentService.analyze_scenario</text>
+  <text class="small" x="308" y="652">проверка существования сценария</text>
+
+  <rect x="573" y="552" width="300" height="118" rx="12" fill="#eef9e9" stroke="#88c971" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="593" y="583">3. Полная история</text>
+  <text class="node-code" x="593" y="606">ChatRepository.list_messages</text>
+  <text class="node-text" x="593" y="632">все видимые RM / client реплики</text>
+  <text class="small" x="593" y="652">без history window и semantic retrieval</text>
+
+  <rect x="913" y="552" width="320" height="118" rx="12" fill="#fff6df" stroke="#efbb54" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="933" y="583">4. Supervisor prompt</text>
+  <text class="node-code" x="933" y="606">ChatPromptTemplate</text>
+  <text class="node-text" x="933" y="632">supervisor.md + customer.md + contract</text>
+  <text class="small" x="933" y="652">+ пронумерованный полный диалог</text>
+
+  <rect x="1273" y="552" width="260" height="118" rx="12" fill="#fff1e6" stroke="#f3a567" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="1293" y="583">5. Structured LLM</text>
+  <text class="node-code" x="1293" y="606">self.llm.ainvoke</text>
+  <text class="node-text" x="1293" y="632">тот же app chat model</text>
+  <text class="small" x="1293" y="652">→ SupervisorAnalysisData</text>
+
+  <rect x="1573" y="552" width="281" height="118" rx="12" fill="#f2edff" stroke="#ac9be8" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="1593" y="583">6. Проверка и отчёт</text>
+  <text class="node-code" x="1593" y="606">overall 0–100 · per-message 0–10</text>
+  <text class="node-text" x="1593" y="632">порядок · speaker · русский язык</text>
+  <text class="small" x="1593" y="652">assessment + recommendations → UI</text>
+
+  <path class="edge" d="M258 611 H288"/>
+  <path class="edge" d="M533 611 H573"/>
+  <path class="edge" d="M873 611 H913"/>
+  <path class="edge" d="M1233 611 H1273"/>
+  <path class="edge" d="M1533 611 H1573"/>
+
+  <path class="edge-dashed" d="M1714 670 V714 H1403 V670"/>
+  <text class="edge-label" x="1468" y="735">невалидная форма → один retry с усиленным contract</text>
+  <text class="note" x="68" y="770">Супервайзер видит профиль клиента и весь видимый диалог, но не скрытые intetions/state/trust/probability. Его отчёт не записывается в SQLite.</text>
+  <text class="warning" x="68" y="792">Проверяется структура отчёта, а не обоснованность score; используется тот же LLM, и supervisor call сейчас не имеет Langfuse trace lineage.</text>
+
+  <g transform="translate(0 350)">
+  <!-- Lane 3: Artifact lifecycle -->
+  <rect class="lane" x="38" y="482" width="1844" height="360" rx="20"/>
+  <text class="lane-title" x="66" y="521">3 · ПЕРСОНЫ И СЦЕНАРИИ КАК ВЕРСИОНИРУЕМЫЕ АРТЕФАКТЫ</text>
+
+  <rect x="68" y="552" width="344" height="205" rx="12" fill="#fff9ea" stroke="#d6a74a" class="node target" filter="url(#shadow)"/>
+  <text class="node-title" x="90" y="588">Каталоги артефактов</text>
+  <text class="node-code" x="90" y="612">Git: YAML / JSON / Markdown</text>
+  <text class="node-text" x="90" y="642">Persona: факты, голос, ограничения</text>
+  <text class="node-text" x="90" y="666">Scenario: цель, стадии, исходы</text>
+  <text class="node-text" x="90" y="690">Prompts, rubrics, output schema</text>
+  <text class="small" x="90" y="726">создаёт domain expert; есть owner</text>
+
+  <rect x="450" y="552" width="286" height="205" rx="12" fill="#f4efff" stroke="#a996e8" class="node target" filter="url(#shadow)"/>
+  <text class="node-title" x="472" y="588">Bundle manifest</text>
+  <text class="node-code" x="472" y="612">bundle_id + schema_version</text>
+  <text class="node-text" x="472" y="642">persona_ref@version</text>
+  <text class="node-text" x="472" y="666">scenario_ref@version</text>
+  <text class="node-text" x="472" y="690">prompt / rubric / model refs</text>
+  <text class="small" x="472" y="726">явные зависимости, без копирования</text>
+
+  <rect x="774" y="552" width="300" height="205" rx="12" fill="#ebfaf2" stroke="#63b98d" class="node target" filter="url(#shadow)"/>
+  <text class="node-title" x="796" y="588">Проверка изменения</text>
+  <text class="node-code" x="796" y="612">schema + refs + review + eval</text>
+  <text class="node-text" x="796" y="642">машинная валидация</text>
+  <text class="node-text" x="796" y="666">domain / compliance review</text>
+  <text class="node-text" x="796" y="690">experiment на fixed dataset</text>
+  <text class="small" x="796" y="726">approval только при пройденном gate</text>
+
+  <rect x="1112" y="552" width="298" height="205" rx="12" fill="#eaf3ff" stroke="#7da9e8" class="node target" filter="url(#shadow)"/>
+  <text class="node-title" x="1134" y="588">Version registry</text>
+  <text class="node-code" x="1134" y="612">immutable version + labels</text>
+  <text class="node-text" x="1134" y="642">draft → staging → production</text>
+  <text class="node-text" x="1134" y="666">diff, changelog, approved_by</text>
+  <text class="node-text" x="1134" y="690">быстрый rollback</text>
+  <text class="small" x="1134" y="726">prompts можно синхронизировать с Langfuse</text>
+
+  <rect x="1448" y="552" width="406" height="205" rx="12" fill="#eef9e9" stroke="#82bd6d" class="node target" filter="url(#shadow)"/>
+  <text class="node-title" x="1470" y="588">Artifact resolver в runtime</text>
+  <text class="node-code" x="1470" y="612">scenario_id → exact bundle version</text>
+  <text class="node-text" x="1470" y="642">фиксирует bundle на всю сессию</text>
+  <text class="node-text" x="1470" y="666">пишет IDs/versions в SQLite и trace</text>
+  <text class="node-text" x="1470" y="690">проверяет совместимость контрактов</text>
+  <text class="small" x="1470" y="726">новая production-версия не меняет старый диалог</text>
+
+  <path class="edge-dashed" d="M412 654 H450"/>
+  <text class="edge-label" x="418" y="640">link</text>
+  <path class="edge-dashed" d="M736 654 H774"/>
+  <text class="edge-label" x="742" y="640">PR</text>
+  <path class="edge-dashed" d="M1074 654 H1112"/>
+  <text class="edge-label" x="1080" y="640">approve</text>
+  <path class="edge-dashed" d="M1410 654 H1448"/>
+  <text class="edge-label" x="1415" y="640">resolve</text>
+
+  <rect x="68" y="782" width="1786" height="44" rx="10" fill="#fff0f1" stroke="#ed9399"/>
+  <text class="warning" x="88" y="802">РАЗРЫВ СЕЙЧАС: customer.md объединяет персону и сценарий, перечитывается каждый turn и может изменить уже начатый диалог; eval-персоны копируются в test cases.</text>
+  <text class="warning" x="88" y="820">Нет artifact IDs/owners/approval; runtime: intetions + state/trust/probability, eval: intentions + done. Общего versioned schema package пока нет.</text>
+
+  <!-- Lane 4: Scoring -->
+  <rect class="lane" x="38" y="862" width="1844" height="350" rx="20"/>
+  <text class="lane-title" x="66" y="901">4 · ОТКУДА БЕРЁТСЯ ОЦЕНКА И ПОЧЕМУ ЕЙ МОЖНО ДОВЕРЯТЬ</text>
+
+  <rect x="68" y="930" width="416" height="220" rx="12" fill="#f2edff" stroke="#ac9be8" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="90" y="966">A. Сигнал состояния клиента</text>
+  <text class="node-code" x="90" y="990">state · trust · purchase_probability · done</text>
+  <text class="node-text" x="90" y="1022">Источник: тот же client LLM</text>
+  <text class="node-text" x="90" y="1046">на основании prompt + контекста.</text>
+  <text class="node-text" x="90" y="1078">Полезен как feedback симуляции.</text>
+  <text class="warning" x="90" y="1120">Не является независимой оценкой RM.</text>
+
+  <rect x="518" y="930" width="416" height="220" rx="12" fill="#eaf0ff" stroke="#89aaff" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="540" y="966">B. Отчёт супервайзера</text>
+  <text class="node-code" x="540" y="990">overall 0–100 · message score 0–10</text>
+  <text class="node-text" x="540" y="1022">Источник: full visible history</text>
+  <text class="node-text" x="540" y="1046">+ supervisor.md + тот же app LLM.</text>
+  <text class="node-text" x="540" y="1078">Проверяются форма, порядок и язык;</text>
+  <text class="small" x="540" y="1102">не обоснованность score; один retry.</text>
+  <text class="warning" x="540" y="1128">Коучинг, но ещё не ground truth.</text>
+
+  <rect x="968" y="930" width="498" height="220" rx="12" fill="#eaf9ef" stroke="#72bd8a" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="990" y="966">C. Offline eval scores</text>
+  <text class="node-code" x="990" y="990">evals/ · 5 datasets · 30 cases</text>
+  <text class="warning" x="990" y="1018">Отдельный harness: production AgentService не запускается.</text>
+  <text class="node-text" x="990" y="1042">Deterministic: schema, limits, leakage, role, done</text>
+  <text class="node-text" x="990" y="1066">LLM judges: persona, realism, intentions,</text>
+  <text class="node-text" x="1008" y="1088">consistency, conversation trajectory</text>
+  <text class="node-text" x="990" y="1112">N repeats → mean/min/max/std/pass rate</text>
+  <text class="small" x="990" y="1134">записываются model/prompt/judge/dataset labels</text>
+
+  <rect x="1500" y="930" width="354" height="220" rx="12" fill="#fff9ea" stroke="#d6a74a" class="node target" filter="url(#shadow)"/>
+  <text class="node-title" x="1522" y="966">D. Контур доверия</text>
+  <text class="node-code" x="1522" y="990">human-labeled golden set</text>
+  <text class="node-text" x="1522" y="1020">blind judge calibration</text>
+  <text class="node-text" x="1522" y="1044">holdout + FP/FN review</text>
+  <text class="node-text" x="1522" y="1068">independent judge + pinned rubric/model</text>
+  <text class="node-text" x="1522" y="1092">disagreement review by experts</text>
+  <text class="small" x="1522" y="1124">только после этого — release gate</text>
+
+  <text class="note" x="68" y="1182">Доверие создаёт не одна цифра, а provenance + узкая рубрика + объяснение + независимая человеческая калибровка. Три типа оценок нельзя смешивать в единый score.</text>
+
+  <!-- Lane 5: Quality loop -->
+  <rect class="lane" x="38" y="1232" width="1844" height="350" rx="20"/>
+  <text class="lane-title" x="66" y="1271">5 · КАК ДОКАЗЫВАЕМ ПОВЕДЕНИЕ И ЛОВИМ РЕГРЕССИИ ПОСЛЕ ИЗМЕНЕНИЙ</text>
+
+  <rect x="68" y="1302" width="176" height="180" rx="12" fill="#f5f7fb" stroke="#aebbd0" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="90" y="1338">Изменение</text>
+  <text class="node-text" x="90" y="1370">code / prompt</text>
+  <text class="node-text" x="90" y="1394">persona / scenario</text>
+  <text class="node-text" x="90" y="1418">model / settings</text>
+  <text class="small" x="90" y="1452">одна версия в PR</text>
+
+  <rect x="274" y="1302" width="220" height="180" rx="12" fill="#e8fbf5" stroke="#67c9a7" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="296" y="1338">Contract tests</text>
+  <text class="node-code" x="296" y="1362">pytest -q tests</text>
+  <text class="node-text" x="296" y="1394">offline и deterministic</text>
+  <text class="node-text" x="296" y="1418">API, storage, schemas, evals</text>
+  <text class="small" x="296" y="1452">быстро ловят hard failures</text>
+
+  <rect x="524" y="1302" width="254" height="180" rx="12" fill="#eaf9ef" stroke="#72bd8a" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="546" y="1338">Offline eval run</text>
+  <text class="node-code" x="546" y="1362">evals.cli run --runs N</text>
+  <text class="node-text" x="546" y="1394">local dataset + version labels</text>
+  <text class="node-text" x="546" y="1418">повторы измеряют variance</text>
+  <text class="small" x="546" y="1452">версии не pinned автоматически</text>
+
+  <rect x="808" y="1302" width="254" height="180" rx="12" fill="#eef5ff" stroke="#7da9e8" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="830" y="1338">Compare baseline</text>
+  <text class="node-code" x="830" y="1362">evals.cli compare</text>
+  <text class="node-text" x="830" y="1394">pass rate + judge means</text>
+  <text class="node-text" x="830" y="1418">latency + tokens + cost</text>
+  <text class="small" x="830" y="1452">совместимость runs не проверяется</text>
+
+  <rect x="1092" y="1302" width="230" height="180" rx="12" fill="#fff9ea" stroke="#d6a74a" class="node target" filter="url(#shadow)"/>
+  <text class="node-title" x="1114" y="1338">CI release gate</text>
+  <text class="node-code" x="1114" y="1362">PR / release workflow</text>
+  <text class="node-text" x="1114" y="1394">agreed thresholds</text>
+  <text class="node-text" x="1114" y="1418">block merge / promotion</text>
+  <text class="warning" x="1114" y="1452">workflow отсутствует сейчас</text>
+
+  <rect x="1352" y="1302" width="204" height="180" rx="12" fill="#f2edff" stroke="#ac9be8" class="node target" filter="url(#shadow)"/>
+  <text class="node-title" x="1374" y="1338">Release</text>
+  <text class="node-code" x="1374" y="1362">pinned bundle</text>
+  <text class="node-text" x="1374" y="1394">production label</text>
+  <text class="node-text" x="1374" y="1418">changelog + rollback</text>
+  <text class="small" x="1374" y="1452">auditable promotion</text>
+
+  <rect x="1586" y="1302" width="268" height="180" rx="12" fill="#f2edff" stroke="#ac9be8" class="node" filter="url(#shadow)"/>
+  <text class="node-title" x="1608" y="1338">Production signals</text>
+  <text class="node-code" x="1608" y="1362">Langfuse traces / sessions</text>
+  <text class="node-text" x="1608" y="1394">errors, latency, generations</text>
+  <text class="node-text" x="1608" y="1418">turn + retriever + generation</text>
+  <text class="warning" x="1608" y="1444">supervisor lineage отсутствует</text>
+  <text class="small" x="1608" y="1464">PII masking before export</text>
+
+  <path class="edge" d="M244 1392 H274"/>
+  <path class="edge" d="M494 1392 H524"/>
+  <path class="edge" d="M778 1392 H808"/>
+  <path class="edge-dashed" d="M1062 1392 H1092"/>
+  <path class="edge-dashed" d="M1322 1392 H1352"/>
+  <path class="edge" d="M1556 1392 H1586"/>
+  <path class="edge-dashed" d="M1720 1482 V1538 H650 V1482"/>
+  <text class="edge-label" x="940" y="1558">production failure / expert feedback → reviewed dataset case → следующий experiment</text>
+
+  <line x1="56" y1="1611" x2="1864" y2="1611" stroke="#d7dfeb"/>
+  <text class="footer" x="56" y="1638">Абсолютной гарантии для стохастической LLM нет. Практическая гарантия — версии и контракты, human-calibrated evals, CI gate, наблюдаемость и rollback.</text>
+  <text class="footer" x="1864" y="1638" text-anchor="end">Сплошное: реализовано · пунктир: требуется для масштабирования</text>
+  </g>
+</svg>
