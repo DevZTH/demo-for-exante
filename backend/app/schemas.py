@@ -74,18 +74,6 @@ class SemanticMatchResponse(BaseModel):
         )
 
 
-class SettingsResponse(BaseModel):
-    app_name: str
-    api_prefix: str
-    llm_provider: str
-    llm_model: str
-    llm_endpoint: str
-    chat_storage_mode: str
-    history_window_messages: int
-    semantic_memory_limit: int
-    embedding_dimensions: int
-
-
 class AgentResponseData(BaseModel):
     """Structured customer response for the EXANTE exercise."""
 

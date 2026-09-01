@@ -11,15 +11,9 @@ from backend.app.schemas import (
     ScenarioResponse,
     ScenarioTurnRequest,
     ScenarioTurnResponse,
-    SettingsResponse,
     SupervisorAnalysisData,
 )
 from backend.app.storage import ChatRepository, ScenarioNotFoundError
-from backend.settings import Settings
-
-
-def get_settings(request: Request) -> Settings:
-    return request.app.state.settings
 
 
 def get_repository(request: Request) -> ChatRepository:
@@ -43,21 +37,6 @@ router = APIRouter(tags=["scenarios"])
 @router.get("/health", tags=["system"])
 def health(repository: ChatRepository = Depends(get_repository)) -> dict[str, object]:
     return {"status": "ok", "database": repository.health()}
-
-
-@router.get("/settings", response_model=SettingsResponse, tags=["system"])
-def read_settings(settings: Settings = Depends(get_settings)) -> SettingsResponse:
-    return SettingsResponse(
-        app_name=settings.app_name,
-        api_prefix=settings.api_prefix,
-        llm_provider="openai_compatible",
-        llm_model=settings.llm_model,
-        llm_endpoint=settings.llm_base_url,
-        chat_storage_mode=settings.chat_storage_mode,
-        history_window_messages=settings.history_window_messages,
-        semantic_memory_limit=settings.semantic_memory_limit,
-        embedding_dimensions=settings.embedding_dimensions,
-    )
 
 
 @router.post("/scenarios/turns", response_model=ScenarioTurnResponse)
